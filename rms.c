@@ -4,6 +4,108 @@
 
 //#define DEBUG
 
+bool checkRMTable(struct task *table, int tablesize)
+{
+	int i;
+	if (tablesize <= 0)
+		return false;
+
+	for (i = 0; i < tablesize; i++) {
+		struct task *rtask = &table[i];
+
+		if (rtask->nominal_exectime_ns <= 0)
+			return false;
+
+		if (rtask->exectime_ns < rtask->nominal_exectime_ns)
+			return false;
+
+		if (rtask->period_ns < rtask->exectime_ns)
+			return false;
+	}
+
+	return true;
+}
+
+struct task *OverloadPeriodTransformTasks(struct task *table, int *tablesize)
+{
+	int i, j;
+	struct task *newtable = NULL;
+	int numEntry = 0;
+	struct task *overload_task;
+
+	newtable = malloc(sizeof(struct task) * 2 * *tablesize);
+	if (newtable == NULL)
+		goto err;
+
+	/* Sort table with higher criticality tasks at top */
+	qsort(table, *tablesize, sizeof(struct task), criticalitySort);
+
+	for (i = 0, numEntry = 0; i < *tablesize; i++) {
+
+		int n;
+		struct task *rtask = &table[i];
+		float min_period = LONG_MAX;
+
+		for (j = i + 1; j < *tablesize; j++) {
+			min_period = (table[j].period_ns < min_period) ?
+					table[j].period_ns : min_period;
+		}
+
+		n = min_period < rtask->period_ns ?
+			ceilf(rtask->period_ns / min_period) :
+			1;
+
+		if (n != 1) {
+			overload_task = NULL;
+			if (rtask->nominal_exectime_ns != rtask->exectime_ns) {
+
+				copyTask(&newtable[numEntry], rtask);
+
+				newtable[numEntry].nominal_exectime_ns =
+					newtable[numEntry].exectime_ns =
+					rtask->exectime_ns - rtask->nominal_exectime_ns;
+
+				newtable[numEntry].isOverloadTask = true;
+				overload_task = &newtable[numEntry];
+				numEntry++;
+			}
+
+			copyTask(&newtable[numEntry], rtask);
+			newtable[numEntry].nominal_exectime_ns =
+				newtable[numEntry].exectime_ns =
+				rtask->nominal_exectime_ns / n;
+			newtable[numEntry].period_ns = rtask->period_ns / n;
+			newtable[numEntry].overload_task = overload_task;
+			numEntry++;
+
+		} else {
+			copyTask(&newtable[numEntry], rtask);
+			numEntry++;
+		}
+	}
+
+	*tablesize = numEntry;
+	free(table);
+	return newtable;
+err:
+	if (table)
+		free(table);
+	if (newtable)
+		free(newtable);
+	return NULL;
+}
+
+
+
+bool admitRMTask(struct task *table, int tablesize, struct task *rtask)
+{
+	if (getResponseTimeRM(table, tablesize, rtask) < 0)
+		return false;
+
+	return true;
+}
+
+
 #ifdef DEBUG
 
 struct task table[] = {
@@ -41,7 +143,7 @@ int main()
 	for (i = 0; i < numEntry; i++) {
 
 		struct task *rtask = &table[i];
-		printf("C:%zu,\t T:%zu,\t ResponseTime:%zd\n",
+		printf("C:%f,\t T:%f,\t ResponseTime:%f\n",
 				rtask->nominal_exectime_ns,
 				rtask->period_ns,
 				getResponseTimeRM(table, numEntry, rtask));
@@ -66,14 +168,25 @@ int main(int argc, char **argv)
 
 	assert(checkRMTable(table, numEntry));
 
+	table = OverloadPeriodTransformTasks(table, &numEntry);
+	if (table == NULL) {
+		printf("Error in conversion\n");
+		return -1;
+	}
+
+	assert(checkRMTable(table, numEntry));
+
 	for (i = 0; i < numEntry; i++) {
 
 		struct task *rtask = &table[i];
-		printf("C:%zu,\t T:%zu,\t ResponseTime:%zd\n",
+		printf("C:%f,\t C':%f,\t T:%f,\t Crit:%zd,\t ResponseTime:%f\n",
 				rtask->nominal_exectime_ns,
+				rtask->exectime_ns,
 				rtask->period_ns,
+				rtask->criticality,
 				getResponseTimeRM(table, numEntry, rtask));
 	}
 
-	return 1;
+	free(table);
+	return 0;
 }
