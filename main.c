@@ -3,7 +3,7 @@
 #include <time.h>
 #include <stdlib.h>
 
-#define NUM_TASK 2
+#define NUM_TASK 3
 
 #define MAX_PERIOD	100
 
@@ -16,20 +16,38 @@ struct expFunc {
 	bool checkPass;
 };
 
+int numExp = 0;
+
 struct expFunc funcList[] =
 {
 	{
-		.name = "OPTSched",
-		.func = OPTIsTaskSched,
-		.printOnFail = true,
+		.name = "CAPAsched",
+		.func = CAPAIsTaskSched,
+		.printOnFail = false,
 		.printOnCheckFail = false,
 	},
+/*
+	{
+		.name = "OPTSched",
+		.func = OPTIsTaskSched,
+		.printOnFail = false,
+		.printOnCheckFail = false,
+	},
+*/
+/*
 	{
 		.name = "PTSchedNavie",
 		.func = PTIsTaskSchedNaive,
-		.printOnFail = false,
+		.printOnFail = true,
 		.printOnCheckFail = false,
-	}
+	},
+*/
+	{
+		.name = "PTSched",
+		.func = PTIsTaskSched,
+		.printOnFail = true,
+		.printOnCheckFail = false,
+	},
 };
 
 void printTaskset(struct task *table, int numEntry)
@@ -93,6 +111,12 @@ void compare(struct task *table, int tablesize, float *criticality)
 		}
 	}
 
+	numExp++;
+
+	if (numExp % 1000000 == 0)
+		printf("Exp Done: %d\n", numExp);
+
+	free(newtable);
 }
 
 void swap(float *a, float *b)

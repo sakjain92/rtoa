@@ -14,6 +14,22 @@ int isHigherPrio(struct task *rtask, struct task *other)
 	return false;
 }
 
+int isHigherCrit(struct task *rtask, struct task *other)
+{
+	assert(!((rtask->period_ns == other->period_ns) &&
+			(rtask->criticality == other->criticality)));
+
+	if (rtask->criticality < other->criticality) {
+		return true;
+	} else if (rtask->criticality > other->criticality) {
+		return false;
+	} else if (rtask->period_ns > other->period_ns) {
+		return true;
+	}
+
+	return false;
+}
+
 
 int getNextInSet(struct task *table, int *sidx, int tablesize,
 		struct task *rtask, int (*inSet)(struct task *r, struct task *o))
@@ -145,6 +161,82 @@ float getResponseTimeRM(struct task *table, int tablesize,
 
   	return resp;
 }
+
+float getResponseTimeCAPA(struct task *table, int tablesize,
+				struct task *rtask)
+{
+	int firsttime=1;
+	float resp=0L;
+	float prevResp=0L;
+	int numArrivals=0l;
+	int idx=0;
+	int selectedIdx=-1;
+
+	resp = rtask->exectime_ns;
+
+	while (firsttime || (resp > prevResp && resp <= rtask->period_ns)){
+
+		firsttime=0;
+		prevResp = resp;
+		resp = rtask->exectime_ns;
+
+    		// get interference from Higher Criticality
+		idx=0;
+		while((selectedIdx = getNextInSet(table, &idx, tablesize, rtask, isHigherCrit)) >=0) {
+			numArrivals = ceilf(prevResp / table[selectedIdx].period_ns);
+			resp += numArrivals * table[selectedIdx].nominal_exectime_ns;
+    		}
+	}
+
+	if (resp > rtask->period_ns)
+		return -1;
+
+  	return resp;
+}
+
+float getResponseTimePT(struct task *table, int tablesize,
+				struct task *rtask)
+{
+	int firsttime=1;
+	float resp=0L;
+	float prevResp=0L;
+	int numArrivals=0l;
+	int idx=0;
+	int selectedIdx=-1;
+
+	resp = rtask->exectime_ns;
+
+	while (firsttime || (resp > prevResp && resp <= rtask->period_ns)){
+
+		firsttime=0;
+		prevResp = resp;
+		resp = rtask->exectime_ns;
+
+    		// get interference from Higher Priority
+		idx=0;
+		while((selectedIdx = getNextInSet(table, &idx, tablesize, rtask, isHigherPrio)) >=0) {
+			/* Higher priority wouldn't overload but might run at higher period */
+			float n = table[selectedIdx].orig_period_ns / table[selectedIdx].period_ns;
+
+			int fullPeriods = floorf(prevResp / table[selectedIdx].period_ns);
+			resp += fullPeriods * (table[selectedIdx].orig_nominal_exectime_ns / n);
+
+			int remainderTime = prevResp - fullPeriods * table[selectedIdx].period_ns;
+
+			/* XXX: Is this higher than neccesary? */
+			numArrivals = ceilf(remainderTime / table[selectedIdx].period_ns);
+			int add = numArrivals * table[selectedIdx].nominal_exectime_ns;
+			resp += add > (table[selectedIdx].orig_nominal_exectime_ns / n)?
+				(table[selectedIdx].orig_nominal_exectime_ns / n): add;
+		}
+	}
+
+	if (resp > rtask->period_ns)
+		return -1;
+
+  	return resp;
+}
+
 
 /*
  * Used by qsort to sort by criticality in decreasing order

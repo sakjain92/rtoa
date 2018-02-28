@@ -13,6 +13,9 @@ struct task {
 
 	bool isOverloadTask;
 
+	float orig_nominal_exectime_ns;
+	float orig_period_ns;
+
 	float exectime_ns;
 	float nominal_exectime_ns;
 	float exectime_in_rm_ns;
@@ -23,6 +26,7 @@ struct task {
 };
 
 
+float getResponseTimeCAPA(struct task *table, int tablesize, struct task *rtask);
 struct task *parseArgs(int argc, char **argv, int *tablesize);
 bool OPTIsTaskSched(struct task *table, int numEntry, bool *checkPass);
 bool PTIsTaskSchedNaive(struct task *table, int numEntry, bool *checkPass);
@@ -31,5 +35,11 @@ float getResponseTimeRM(struct task *table, int tablesize,
 int criticalitySort(const void *a, const void *b);
 void copyTask(struct task *dest, struct task *src);
 bool checkRMTable(struct task *table, int tablesize);
+
+bool CAPAIsTaskSched(struct task *table, int numEntry, bool *checkPass);
+bool PTIsTaskSched(struct task *table, int numEntry, bool *checkPass);
+
+float getResponseTimePT(struct task *table, int tablesize,
+				struct task *rtask);
 
 #endif /* __COMMON_H__ */

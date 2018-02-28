@@ -26,6 +26,9 @@ struct task *PeriodTransformTasks(struct task *table, int *tablesize)
 			ceilf(rtask->period_ns / min_period) :
 			1;
 
+		rtask->orig_nominal_exectime_ns = rtask->nominal_exectime_ns;
+		rtask->orig_period_ns = rtask->period_ns;
+
 		rtask->nominal_exectime_ns =
 			rtask->exectime_ns =
 				rtask->exectime_ns / n;
@@ -76,6 +79,47 @@ bool PTIsTaskSchedNaive(struct task *table, int numEntry, bool *checkPass)
 	return ret;
 }
 
+float getPTTaskResponseTime(struct task *table, int tablesize, struct task *rtask)
+{
+	return getResponseTimePT(table, tablesize, rtask);
+}
+
+bool admitAllPTTask(struct task *table, int tablesize)
+{
+	int i;
+
+	qsort(table, tablesize, sizeof(struct task), criticalitySort);
+
+	for (i = 0; i < tablesize; i++) {
+
+		struct task *rtask = &table[i];
+		if (getPTTaskResponseTime(table, tablesize, rtask) < 0)
+			return false;
+	}
+
+	return true;
+}
+
+
+/* Checks if OPT can schedule task (naively test) */
+bool PTIsTaskSched(struct task *table, int numEntry, bool *checkPass)
+{
+	bool ret;
+
+	/* No checks */
+	*checkPass = true;
+
+	assert(checkRMTable(table, numEntry));
+
+	table = PeriodTransformTasks(table, &numEntry);
+	assert(table);
+
+	assert(checkRMTable(table, numEntry));
+
+	ret = admitAllPTTask(table, numEntry);
+
+	return ret;
+}
 
 #ifdef DEBUG
 
@@ -105,10 +149,10 @@ int main(int argc, char **argv)
 				rtask->exectime_ns,
 				rtask->period_ns,
 				rtask->criticality,
-				getPTTaskNaiveResponseTime(table, numEntry, rtask));
+				getPTTaskResponseTime(table, numEntry, rtask));
 	}
 
-	printf("OPT admit all: %d\n", admitAllPTTaskNaive(table, numEntry));
+	printf("OPT admit all: %d\n", admitAllPTTask(table, numEntry));
 
 	free(table);
 	return 0;
