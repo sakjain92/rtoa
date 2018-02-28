@@ -97,14 +97,61 @@ err:
 
 
 
-bool admitRMTask(struct task *table, int tablesize, struct task *rtask)
+float getOPTTaskResponseTime(struct task *table, int tablesize, struct task *rtask)
 {
-	if (getResponseTimeRM(table, tablesize, rtask) < 0)
-		return false;
+	/*
+	 * Need to consider the task (in overload situation) and all higher
+	 * criticality task (in non overloaded state)
+	 */
+	struct task *newtable = NULL;
+	int numEntry = 0;
+	int i;
+	float ret;
+
+	newtable = malloc(sizeof(struct task) * tablesize);
+	assert(newtable);
+	assert(!rtask->isOverloadTask);
+
+	for (i = 0, numEntry = 0; &table[i] != rtask; i++) {
+		if (table[i].isOverloadTask)
+			continue;
+		copyTask(&newtable[numEntry], &table[i]);
+		numEntry++;
+	}
+
+	/* Incase of parent task, we check if the overload task is scheduable */
+	copyTask(&newtable[numEntry++], rtask);
+
+	if (rtask->overload_task)
+		copyTask(&newtable[numEntry++], rtask->overload_task);
+
+	ret = getResponseTimeRM(newtable, numEntry, &newtable[numEntry - 1]);
+	free(newtable);
+
+	if (ret > rtask->period_ns)
+		ret = -1;
+
+	return ret;
+}
+
+bool admitAllOPTTask(struct task *table, int tablesize)
+{
+	int i;
+
+	/* Sort table with higher criticality tasks at top */
+	qsort(table, tablesize, sizeof(struct task), criticalitySort);
+
+	for (i = 0; i < tablesize; i++) {
+
+		struct task *rtask = &table[i];
+		if (rtask->isOverloadTask)
+			continue;
+		if (getOPTTaskResponseTime(table, tablesize, rtask) < 0)
+			return false;
+	}
 
 	return true;
 }
-
 
 #ifdef DEBUG
 
@@ -176,16 +223,21 @@ int main(int argc, char **argv)
 
 	assert(checkRMTable(table, numEntry));
 
+	/* Sort table with higher criticality tasks at top */
+	qsort(table, numEntry, sizeof(struct task), criticalitySort);
+
 	for (i = 0; i < numEntry; i++) {
 
 		struct task *rtask = &table[i];
-		printf("C:%f,\t C':%f,\t T:%f,\t Crit:%zd,\t ResponseTime:%f\n",
+		printf("C:%f,\t C':%f,\t T:%f,\t Crit:%zd,\t Scheduability:%f\n",
 				rtask->nominal_exectime_ns,
 				rtask->exectime_ns,
 				rtask->period_ns,
 				rtask->criticality,
-				getResponseTimeRM(table, numEntry, rtask));
+				rtask->isOverloadTask ? 0 : getOPTTaskResponseTime(table, numEntry, rtask));
 	}
+
+	printf("OPT admit all: %d\n", admitAllOPTTask(table, numEntry));
 
 	free(table);
 	return 0;

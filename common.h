@@ -151,7 +151,7 @@ float getResponseTimeRM(struct task *table, int tablesize,
 
 		firsttime=0;
 		prevResp = resp;
-		resp = rtask->nominal_exectime_ns;
+		resp = rtask->exectime_ns;
 
     		// get interference from Higher Priority
 		idx=0;
