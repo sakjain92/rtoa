@@ -4,7 +4,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-#define NUM_TASK 3
+#define NUM_TASK 2
 
 #define MAX_PERIOD	100
 
@@ -23,44 +23,54 @@ int numUnscheduable = 0;
 
 struct expFunc funcList[] =
 {
+
 /*
+	{
+		.name = "RMsched",
+		.func = RMIsTaskSched,
+		.printOnFail = true,
+		.printOnCheckFail = false,
+	},
+*/
+
 	{
 		.name = "CAPAsched",
 		.func = CAPAIsTaskSched,
 		.printOnFail = false,
 		.printOnCheckFail = false,
 	},
-*/
+
+/*
 	{
 		.name = "OPTSched",
 		.func = OPTIsTaskSched,
 		.printOnFail = false,
 		.printOnCheckFail = false,
 	},
-
+*/
 /* Obselete
 	{
 		.name = "PTSchedNavie",
 		.func = PTIsTaskSchedNaive,
-		.printOnFail = true,
+		.printOnFail = false,
 		.printOnCheckFail = false,
 	},
 */
-
+/*
 	{
 		.name = "PTSched",
 		.func = PTIsTaskSched,
-		.printOnFail = true,
+		.printOnFail = false,
 		.printOnCheckFail = false,
 	},
-/*
+*/
 	{
 		.name = "ZSRMSSched",
 		.func = ZSRMSIsTaskSched,
 		.printOnFail = false,
 		.printOnCheckFail = false,
 	},
-*/
+
 };
 
 void printTaskset(struct task *table, int numEntry)
@@ -139,7 +149,12 @@ void compare(struct task *table, int tablesize, double *criticality)
 	numExp++;
 
 	if (numExp % 1000000 == 0) {
-		printf("Exp Done: %d, Unscheduable: %d\n", numExp, numUnscheduable);
+		printf("Num Tasks: %d, Exp Done: %d, Scheduable: %d, Unscheduable: %d (%f%%)\n",
+				NUM_TASK, numExp,
+				numExp - numUnscheduable,
+				numUnscheduable,
+				(float)(numUnscheduable * 100) / (float)numExp);
+
 		for (i = 0; i < fsize; i++) {
 			struct expFunc *ef = &funcList[i];
 			printf("%s:\t Fails: %zd \t(%.1f%%)\n", ef->name, ef->fails, (double)(ef->fails * 100) / (double)(numExp - numUnscheduable));
@@ -179,6 +194,7 @@ int main()
 {
 	double criticality[NUM_TASK];
 	int i;
+	float norm_util;
 
 	srand(time(NULL));
 
@@ -199,6 +215,18 @@ int main()
 			rtask->exectime_ns = exec = (rand() % period) + 1;
 			rtask->nominal_exectime_ns = (double)(rand() % exec) + 1;
 		}
+
+		/* Check utilization should be less than 1 */
+		for (i = 0, norm_util = 0; i < NUM_TASK; i++) {
+			struct task *rtask = &table[i];
+			norm_util += rtask->nominal_exectime_ns / rtask->period_ns;
+			if (norm_util > 1) {
+				break;
+			}
+		}
+
+		if (norm_util > 1)
+			continue;
 
 		permute(criticality, 0, NUM_TASK, compare, table);
 	}

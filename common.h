@@ -46,4 +46,5 @@ bool ZSRMSIsTaskSched(struct task *table, int numEntry, bool *checkPass);
 double getResponseTimePT(struct task *table, int tablesize,
 				struct task *rtask);
 
+bool RMIsTaskSched(struct task *table, int numEntry, bool *checkPass);
 #endif /* __COMMON_H__ */
