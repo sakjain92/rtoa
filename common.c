@@ -6,6 +6,8 @@ int isHigherPrio(struct task *rtask, struct task *other)
 	if (rtask->period_ns > other->period_ns)
 		return true;
 	if (rtask->period_ns == other->period_ns) {
+		if (rtask->criticality == other->criticality)
+			while(1);
 		assert(rtask->criticality != other->criticality);
 		if (rtask->criticality < other->criticality)
 			return true;
@@ -101,16 +103,16 @@ struct task *parseArgs(int argc, char **argv, int *tablesize)
 			switch(field) {
 
 			case 1:
-				table[i].nominal_exectime_ns = (float)num;
+				table[i].nominal_exectime_ns = (double)num;
 				break;
 			case 2:
-				table[i].exectime_ns = (float)num;
+				table[i].exectime_ns = (double)num;
 				break;
 			case 3:
-				table[i].period_ns = (float)num;
+				table[i].period_ns = (double)num;
 				break;
 			case 4:
-				table[i].criticality = (float)num;
+				table[i].criticality = (double)num;
 				break;
 			default:
 				goto err;
@@ -130,12 +132,12 @@ err:
 	return NULL;
 }
 
-float getResponseTimeRM(struct task *table, int tablesize,
+double getResponseTimeRM(struct task *table, int tablesize,
 						struct task *rtask)
 {
 	int firsttime=1;
-	float resp=0L;
-	float prevResp=0L;
+	double resp=0L;
+	double prevResp=0L;
 	int numArrivals=0l;
 	int idx=0;
 	int selectedIdx=-1;
@@ -162,12 +164,12 @@ float getResponseTimeRM(struct task *table, int tablesize,
   	return resp;
 }
 
-float getResponseTimeCAPA(struct task *table, int tablesize,
+double getResponseTimeCAPA(struct task *table, int tablesize,
 				struct task *rtask)
 {
 	int firsttime=1;
-	float resp=0L;
-	float prevResp=0L;
+	double resp=0L;
+	double prevResp=0L;
 	int numArrivals=0l;
 	int idx=0;
 	int selectedIdx=-1;
@@ -194,12 +196,12 @@ float getResponseTimeCAPA(struct task *table, int tablesize,
   	return resp;
 }
 
-float getResponseTimePT(struct task *table, int tablesize,
+double getResponseTimePT(struct task *table, int tablesize,
 				struct task *rtask)
 {
 	int firsttime=1;
-	float resp=0L;
-	float prevResp=0L;
+	double resp=0L;
+	double prevResp=0L;
 	int numArrivals=0l;
 	int idx=0;
 	int selectedIdx=-1;
@@ -216,7 +218,7 @@ float getResponseTimePT(struct task *table, int tablesize,
 		idx=0;
 		while((selectedIdx = getNextInSet(table, &idx, tablesize, rtask, isHigherPrio)) >=0) {
 			/* Higher priority wouldn't overload but might run at higher period */
-			float n = table[selectedIdx].orig_period_ns / table[selectedIdx].period_ns;
+			double n = table[selectedIdx].orig_period_ns / table[selectedIdx].period_ns;
 
 			int fullPeriods = floorf(prevResp / table[selectedIdx].period_ns);
 			resp += fullPeriods * (table[selectedIdx].orig_nominal_exectime_ns / n);
@@ -247,7 +249,7 @@ int criticalitySort(const void *a, const void *b)
 	struct task *rtask = (struct task *)a;
 	struct task *o = (struct task *)b;
 
-	float diff = o->criticality - rtask->criticality;
+	double diff = o->criticality - rtask->criticality;
 	if (diff < 0)
 		return -1;
 	else if (diff > 0)

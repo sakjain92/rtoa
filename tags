@@ -1,0 +1,78 @@
+!_TAG_FILE_FORMAT	2	/extended format; --format=1 will not append ;" to lines/
+!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted, 2=foldcase/
+!_TAG_PROGRAM_AUTHOR	Darren Hiebert	/dhiebert@users.sourceforge.net/
+!_TAG_PROGRAM_NAME	Exuberant Ctags	//
+!_TAG_PROGRAM_URL	http://ctags.sourceforge.net	/official site/
+!_TAG_PROGRAM_VERSION	5.9~svn20110310	//
+CAPAIsTaskSched	capa.c	/^bool CAPAIsTaskSched(struct task *table, int numEntry, bool *checkPass)$/;"	f
+MAX_PERIOD	main.c	9;"	d	file:
+NUM_TASK	main.c	7;"	d	file:
+OPTIsTaskSched	opt_rms.c	/^bool OPTIsTaskSched(struct task *table, int numEntry, bool *checkPass)$/;"	f
+OverloadPeriodTransformTasks	opt_rms.c	/^struct task *OverloadPeriodTransformTasks(struct task *table, int *tablesize)$/;"	f
+PTIsTaskSched	pt_rms.c	/^bool PTIsTaskSched(struct task *table, int numEntry, bool *checkPass)$/;"	f
+PTIsTaskSchedNaive	pt_rms.c	/^bool PTIsTaskSchedNaive(struct task *table, int numEntry, bool *checkPass)$/;"	f
+PeriodTransformTasks	pt_rms.c	/^struct task *PeriodTransformTasks(struct task *table, int *tablesize)$/;"	f
+VOPTIsTaskSched	opt_rms.c	/^bool VOPTIsTaskSched(struct task *table, int numEntry, bool *checkPass)$/;"	f
+ZSRMSIsTaskSched	zsrms.c	/^bool ZSRMSIsTaskSched(struct task *table, int numEntry, bool *checkPass)$/;"	f
+__COMMON_H__	common.h	2;"	d
+admitAllCAPATask	capa.c	/^bool admitAllCAPATask(struct task *table, int tablesize)$/;"	f
+admitAllOPTTask	opt_rms.c	/^bool admitAllOPTTask(struct task *table, int tablesize)$/;"	f
+admitAllPTTask	pt_rms.c	/^bool admitAllPTTask(struct task *table, int tablesize)$/;"	f
+admitAllPTTaskNaive	pt_rms.c	/^bool admitAllPTTaskNaive(struct task *table, int tablesize)$/;"	f
+admitAllZSRMSTask	zsrms.c	/^bool admitAllZSRMSTask(struct task *table, int tablesize)$/;"	f
+checkOPTTable	opt_rms.c	/^bool checkOPTTable(struct task *table, int numEntry)$/;"	f
+checkPass	main.c	/^	bool checkPass;$/;"	m	struct:expFunc	file:
+checkRMTable	common.c	/^bool checkRMTable(struct task *table, int tablesize)$/;"	f
+compare	main.c	/^void compare(struct task *table, int tablesize, float *criticality)$/;"	f
+copyTask	common.c	/^void copyTask(struct task *dest, struct task *src)$/;"	f
+criticality	common.h	/^	float criticality;$/;"	m	struct:task
+criticalitySort	common.c	/^int criticalitySort(const void *a, const void *b)$/;"	f
+exectime_in_rm_ns	common.h	/^	float exectime_in_rm_ns;$/;"	m	struct:task
+exectime_ns	common.h	/^	float exectime_ns;$/;"	m	struct:task
+expFunc	main.c	/^struct expFunc {$/;"	s	file:
+fails	main.c	/^	size_t fails;$/;"	m	struct:expFunc	file:
+func	main.c	/^	bool (*func)(struct task *table, int tablesize, bool *checkPass);$/;"	m	struct:expFunc	file:
+funcList	main.c	/^struct expFunc funcList[] =$/;"	v	typeref:struct:expFunc
+getCAPATaskResponseTime	capa.c	/^float getCAPATaskResponseTime(struct task *table, int tablesize, struct task *rtask)$/;"	f
+getExecTimeHigherPrioHigherCrit	zsrms.c	/^static float getExecTimeHigherPrioHigherCrit(struct task *rtask) {$/;"	f	file:
+getExecTimeHigherPrioSameCrit	zsrms.c	/^static float getExecTimeHigherPrioSameCrit(struct task *rtask) {$/;"	f	file:
+getExecTimeLowerPrioHigherCrit	zsrms.c	/^static float getExecTimeLowerPrioHigherCrit(struct task *rtask) {$/;"	f	file:
+getNextInSet	common.c	/^int getNextInSet(struct task *table, int *sidx, int tablesize,$/;"	f
+getNextInSet	zsrms.c	/^static int getNextInSet(struct task *table, int *cidx, int tablesize,$/;"	f	file:
+getOPTTaskResponseTime	opt_rms.c	/^float getOPTTaskResponseTime(struct task *table, int tablesize, struct task *rtask)$/;"	f
+getPTTaskNaiveResponseTime	pt_rms.c	/^float getPTTaskNaiveResponseTime(struct task *table, int tablesize, struct task *rtask)$/;"	f
+getPTTaskResponseTime	pt_rms.c	/^float getPTTaskResponseTime(struct task *table, int tablesize, struct task *rtask)$/;"	f
+getRMInterference	zsrms.c	/^static float getRMInterference(struct task *table, int tablesize, struct task *rtask, float Z) {$/;"	f	file:
+getResponseTimeCAPA	common.c	/^float getResponseTimeCAPA(struct task *table, int tablesize,$/;"	f
+getResponseTimeCritNs	zsrms.c	/^static float getResponseTimeCritNs(struct task *table, int tablesize, struct task *rtask) {$/;"	f	file:
+getResponseTimePT	common.c	/^float getResponseTimePT(struct task *table, int tablesize,$/;"	f
+getResponseTimeRM	common.c	/^float getResponseTimeRM(struct task *table, int tablesize,$/;"	f
+getZSRMSTaskResponseTime	zsrms.c	/^bool getZSRMSTaskResponseTime(struct task *table, int tablesize, struct task *rtask, float *calcZ, float *calcResp)$/;"	f
+isHigherCrit	common.c	/^int isHigherCrit(struct task *rtask, struct task *other)$/;"	f
+isHigherPrio	common.c	/^int isHigherPrio(struct task *rtask, struct task *other)$/;"	f
+isHigherPrioHigherCrit	zsrms.c	/^static bool isHigherPrioHigherCrit(struct task *rtask, struct task *o) {$/;"	f	file:
+isHigherPrioLowerCrit	zsrms.c	/^static bool isHigherPrioLowerCrit(struct task *rtask, struct task *o) {$/;"	f	file:
+isHigherPrioSameCrit	zsrms.c	/^static bool isHigherPrioSameCrit(struct task *rtask, struct task *o) {$/;"	f	file:
+isLowerPrioHigherCrit	zsrms.c	/^static bool isLowerPrioHigherCrit(struct task *rtask, struct task *o) {$/;"	f	file:
+isOverloadTask	common.h	/^	bool isOverloadTask;$/;"	m	struct:task
+main	capa.c	/^int main(int argc, char **argv)$/;"	f
+main	main.c	/^int main()$/;"	f
+main	opt_rms.c	/^int main(int argc, char **argv)$/;"	f
+main	pt_rms.c	/^int main(int argc, char **argv)$/;"	f
+main	zsrms.c	/^int main(int argc, char **argv)$/;"	f
+name	main.c	/^	char *name;$/;"	m	struct:expFunc	file:
+nominal_exectime_ns	common.h	/^	float nominal_exectime_ns;$/;"	m	struct:task
+numExp	main.c	/^int numExp = 0;$/;"	v
+numUnscheduable	main.c	/^int numUnscheduable = 0;$/;"	v
+orig_nominal_exectime_ns	common.h	/^	float orig_nominal_exectime_ns;$/;"	m	struct:task
+orig_period_ns	common.h	/^	float orig_period_ns;$/;"	m	struct:task
+overload_task	common.h	/^	struct task *overload_task;$/;"	m	struct:task	typeref:struct:task::task
+parseArgs	common.c	/^struct task *parseArgs(int argc, char **argv, int *tablesize)$/;"	f
+period_ns	common.h	/^	float period_ns;$/;"	m	struct:task
+permute	main.c	/^void permute(float *array, int i, int length,$/;"	f
+printOnCheckFail	main.c	/^	bool printOnCheckFail;$/;"	m	struct:expFunc	file:
+printOnFail	main.c	/^	bool printOnFail;$/;"	m	struct:expFunc	file:
+printTaskset	main.c	/^void printTaskset(struct task *table, int numEntry)$/;"	f
+result	main.c	/^	bool result;$/;"	m	struct:expFunc	file:
+swap	main.c	/^void swap(float *a, float *b)$/;"	f
+task	common.h	/^struct task {$/;"	s

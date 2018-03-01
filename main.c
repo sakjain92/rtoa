@@ -2,8 +2,9 @@
 #include "common.h"
 #include <time.h>
 #include <stdlib.h>
+#include <unistd.h>
 
-#define NUM_TASK 2
+#define NUM_TASK 3
 
 #define MAX_PERIOD	100
 
@@ -14,26 +15,29 @@ struct expFunc {
 	bool printOnCheckFail;
 	bool result;
 	bool checkPass;
+	size_t fails;
 };
 
 int numExp = 0;
+int numUnscheduable = 0;
 
 struct expFunc funcList[] =
 {
+/*
 	{
 		.name = "CAPAsched",
 		.func = CAPAIsTaskSched,
-		.printOnFail = true,
+		.printOnFail = false,
 		.printOnCheckFail = false,
 	},
-/*
+*/
 	{
 		.name = "OPTSched",
 		.func = OPTIsTaskSched,
 		.printOnFail = false,
 		.printOnCheckFail = false,
 	},
-*/
+
 /* Obselete
 	{
 		.name = "PTSchedNavie",
@@ -42,20 +46,21 @@ struct expFunc funcList[] =
 		.printOnCheckFail = false,
 	},
 */
-/*
+
 	{
 		.name = "PTSched",
 		.func = PTIsTaskSched,
 		.printOnFail = true,
 		.printOnCheckFail = false,
 	},
-*/
+/*
 	{
 		.name = "ZSRMSSched",
 		.func = ZSRMSIsTaskSched,
 		.printOnFail = false,
 		.printOnCheckFail = false,
 	},
+*/
 };
 
 void printTaskset(struct task *table, int numEntry)
@@ -73,7 +78,7 @@ void printTaskset(struct task *table, int numEntry)
 
 }
 
-void compare(struct task *table, int tablesize, float *criticality)
+void compare(struct task *table, int tablesize, double *criticality)
 {
 	int i;
 	struct task *newtable = malloc(sizeof(struct task) * tablesize);
@@ -105,6 +110,18 @@ void compare(struct task *table, int tablesize, float *criticality)
 		}
 	}
 
+	/* If atleast someone passed a test cases */
+	if (pass == true) {
+		for (i = 0; i < fsize; i++) {
+			struct expFunc *ef = &funcList[i];
+			if (ef->result == false) {
+				ef->fails++;
+			}
+		}
+	} else {
+		numUnscheduable++;
+	}
+
 	/* If atleast someone passed but a function that req printing on fail didn't pass */
 	if (pass && printReq) {
 		printf("-------------------------------------------------------\n");
@@ -121,21 +138,27 @@ void compare(struct task *table, int tablesize, float *criticality)
 
 	numExp++;
 
-	if (numExp % 1000000 == 0)
-		printf("Exp Done: %d\n", numExp);
+	if (numExp % 1000000 == 0) {
+		printf("Exp Done: %d, Unscheduable: %d\n", numExp, numUnscheduable);
+		for (i = 0; i < fsize; i++) {
+			struct expFunc *ef = &funcList[i];
+			printf("%s:\t Fails: %zd \t(%.1f%%)\n", ef->name, ef->fails, (double)(ef->fails * 100) / (double)(numExp - numUnscheduable));
+		}
+		sleep(2);
+	}
 
 	free(newtable);
 }
 
-void swap(float *a, float *b)
+void swap(double *a, double *b)
 {
-	float temp = *a;
+	double temp = *a;
 	*a = *b;
 	*b = temp;
 }
 
-void permute(float *array, int i, int length,
-		void (*func)(struct task *table, int tablesize, float *criticality),
+void permute(double *array, int i, int length,
+		void (*func)(struct task *table, int tablesize, double *criticality),
 		struct task *table) {
 
 	if (length == i){
@@ -154,7 +177,7 @@ void permute(float *array, int i, int length,
 
 int main()
 {
-	float criticality[NUM_TASK];
+	double criticality[NUM_TASK];
 	int i;
 
 	srand(time(NULL));
@@ -174,7 +197,7 @@ int main()
 			int period, exec;
 			rtask->period_ns = period = (rand() % MAX_PERIOD) + 1;
 			rtask->exectime_ns = exec = (rand() % period) + 1;
-			rtask->nominal_exectime_ns = (float)(rand() % exec) + 1;
+			rtask->nominal_exectime_ns = (double)(rand() % exec) + 1;
 		}
 
 		permute(criticality, 0, NUM_TASK, compare, table);

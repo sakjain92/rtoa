@@ -12,7 +12,11 @@ capa:
 zsrms:
 	gcc -g3 -Wall -DDEBUG -Wextra zsrms.c common.c -o zsrms.elf -lm
 
+vopt:
+	gcc -g3 -Wall -Wextra -c opt_rms.c -o obj/opt_rms.o -lm
+	gcc -g3 -Wall -DDEBUG -Wextra obj/opt_rms.o vopt_rms.c -o vopt_rms.elf -lm
+
 exp:
 	gcc -g3 -Wall -Wextra pt_rms.c opt_rms.c capa.c zsrms.c main.c common.c -o exp.elf -lm
 clean:
-	rm -f *.elf
+	rm -f *.elf obj/*.o

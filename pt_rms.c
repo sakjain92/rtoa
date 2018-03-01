@@ -15,7 +15,7 @@ struct task *PeriodTransformTasks(struct task *table, int *tablesize)
 
 		int n;
 		struct task *rtask = &table[i];
-		float min_period = LONG_MAX;
+		double min_period = LONG_MAX;
 
 		for (j = i + 1; j < *tablesize; j++) {
 			min_period = (table[j].period_ns < min_period) ?
@@ -39,7 +39,7 @@ struct task *PeriodTransformTasks(struct task *table, int *tablesize)
 }
 
 /* Naive because not all of the cycles are needed to be ran if not overloading */
-float getPTTaskNaiveResponseTime(struct task *table, int tablesize, struct task *rtask)
+double getPTTaskNaiveResponseTime(struct task *table, int tablesize, struct task *rtask)
 {
 	return getResponseTimeRM(table, tablesize, rtask);
 }
@@ -79,7 +79,7 @@ bool PTIsTaskSchedNaive(struct task *table, int numEntry, bool *checkPass)
 	return ret;
 }
 
-float getPTTaskResponseTime(struct task *table, int tablesize, struct task *rtask)
+double getPTTaskResponseTime(struct task *table, int tablesize, struct task *rtask)
 {
 	return getResponseTimePT(table, tablesize, rtask);
 }

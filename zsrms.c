@@ -43,23 +43,23 @@ static int getNextInSet(struct task *table, int *cidx, int tablesize,
 	return selectedIdx;
 }
 
-static float getExecTimeHigherPrioHigherCrit(struct task *rtask) {
+static double getExecTimeHigherPrioHigherCrit(struct task *rtask) {
 	return rtask->nominal_exectime_ns;
 }
 
-static float getExecTimeHigherPrioSameCrit(struct task *rtask) {
+static double getExecTimeHigherPrioSameCrit(struct task *rtask) {
 	return rtask->exectime_ns;
 }
 
-static float getExecTimeLowerPrioHigherCrit(struct task *rtask) {
+static double getExecTimeLowerPrioHigherCrit(struct task *rtask) {
 	return (rtask->nominal_exectime_ns - rtask->exectime_in_rm_ns);
 }
 
-static float getResponseTimeCritNs(struct task *table, int tablesize, struct task *rtask) {
+static double getResponseTimeCritNs(struct task *table, int tablesize, struct task *rtask) {
 
 	int firsttime=1;
-	float resp=0L;
-	float prevResp=0L;
+	double resp=0L;
+	double prevResp=0L;
 	size_t numArrivals=0l;
 	int idx=0;
 	int selectedIdx=-1;
@@ -101,12 +101,12 @@ static float getResponseTimeCritNs(struct task *table, int tablesize, struct tas
   	return resp;
 }
 
-static float getRMInterference(struct task *table, int tablesize, struct task *rtask, float Z) {
+static double getRMInterference(struct task *table, int tablesize, struct task *rtask, double Z) {
 
 	int idx;
 	int selectedIdx;
 	size_t numArrivals;
-	float interf=0L;
+	double interf=0L;
 
   	idx=0;
 	while((selectedIdx = getNextInSet(table, &idx, tablesize, rtask, isHigherPrioHigherCrit)) >=0){
@@ -129,14 +129,14 @@ static float getRMInterference(struct task *table, int tablesize, struct task *r
 	return interf;
 }
 
-bool getZSRMSTaskResponseTime(struct task *table, int tablesize, struct task *rtask, float *calcZ, float *calcResp)
+bool getZSRMSTaskResponseTime(struct task *table, int tablesize, struct task *rtask, double *calcZ, double *calcResp)
 {
-	float resp=0L;
-	float Z=0L;
-	float prevZ = 0L;
-	float interf=0L;
-	float interf1=0L;
-	float slack=0L;
+	double resp=0L;
+	double Z=0L;
+	double prevZ = 0L;
+	double interf=0L;
+	double interf1=0L;
+	double slack=0L;
 
 	rtask->exectime_in_rm_ns = 0L;
 	Z = 1L;
@@ -197,7 +197,7 @@ bool getZSRMSTaskResponseTime(struct task *table, int tablesize, struct task *rt
 bool admitAllZSRMSTask(struct task *table, int tablesize)
 {
 	int i;
-	float Z, resp;
+	double Z, resp;
 
 	/* Sort table with higher criticality tasks at top */
 	qsort(table, tablesize, sizeof(struct task), criticalitySort);
@@ -233,7 +233,7 @@ bool ZSRMSIsTaskSched(struct task *table, int numEntry, bool *checkPass)
 int main(int argc, char **argv)
 {
 	int i, numEntry;
-	float Z, resp;
+	double Z, resp;
 	bool isSched;
 
 	struct task *table = parseArgs(argc, argv, &numEntry);

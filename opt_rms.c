@@ -5,7 +5,7 @@
 
 struct task *OverloadPeriodTransformTasks(struct task *table, int *tablesize)
 {
-	int i, j;
+	int i, j, k;
 	struct task *newtable = NULL;
 	int numEntry = 0;
 	struct task *overload_task;
@@ -16,49 +16,54 @@ struct task *OverloadPeriodTransformTasks(struct task *table, int *tablesize)
 	/* Sort table with higher criticality tasks at top */
 	qsort(table, *tablesize, sizeof(struct task), criticalitySort);
 
-	for (i = *tablesize - 1, numEntry = 0; i >= 0; i--) {
+	for (i = 0, numEntry = *tablesize; i < *tablesize; i++) {
+
+		struct task *rtask = &table[i];
+		if (rtask->nominal_exectime_ns != rtask->exectime_ns)
+			numEntry++;
+	}
+
+	for (i = *tablesize - 1, k = numEntry - 1; i >= 0; i--) {
 
 		int n;
 		struct task *rtask = &table[i];
-		float min_period = LONG_MAX;
+		double min_period = LONG_MAX;
 
-		for (j = i + 1; j < *tablesize; j++) {
-			min_period = (table[j].period_ns < min_period) ?
-					table[j].period_ns : min_period;
+		for (j = k + 1; j < numEntry; j++) {
+			min_period = (newtable[j].period_ns < min_period) ?
+					newtable[j].period_ns : min_period;
 		}
 
 		n = min_period < rtask->period_ns ?
 			ceilf(rtask->period_ns / min_period) :
 			1;
 
-		if (n != 1) {
-			overload_task = NULL;
-			if (rtask->nominal_exectime_ns != rtask->exectime_ns) {
+		overload_task = NULL;
+		if (rtask->nominal_exectime_ns != rtask->exectime_ns) {
 
-				copyTask(&newtable[numEntry], rtask);
+			copyTask(&newtable[k], rtask);
 
-				newtable[numEntry].nominal_exectime_ns =
-					newtable[numEntry].exectime_ns =
-					rtask->exectime_ns - rtask->nominal_exectime_ns;
+			newtable[k].nominal_exectime_ns =
+				newtable[k].exectime_ns =
+				rtask->exectime_ns - rtask->nominal_exectime_ns;
 
-				newtable[numEntry].isOverloadTask = true;
-				overload_task = &newtable[numEntry];
-				numEntry++;
-			}
-
-			copyTask(&newtable[numEntry], rtask);
-			newtable[numEntry].nominal_exectime_ns =
-				newtable[numEntry].exectime_ns =
-				rtask->nominal_exectime_ns / n;
-			newtable[numEntry].period_ns = rtask->period_ns / n;
-			newtable[numEntry].overload_task = overload_task;
-			numEntry++;
-
-		} else {
-			copyTask(&newtable[numEntry], rtask);
-			numEntry++;
+			newtable[k].isOverloadTask = true;
+			newtable[k].overload_task = NULL;
+			overload_task = &newtable[k];
+			k--;
 		}
+
+		copyTask(&newtable[k], rtask);
+		newtable[k].nominal_exectime_ns =
+			newtable[k].exectime_ns =
+			rtask->nominal_exectime_ns / n;
+		newtable[k].period_ns = rtask->period_ns / n;
+		newtable[k].overload_task = overload_task;
+		newtable[k].isOverloadTask = false;
+		k--;
 	}
+
+	assert(k == -1);
 
 	*tablesize = numEntry;
 	return newtable;
@@ -70,7 +75,7 @@ struct task *OverloadPeriodTransformTasks(struct task *table, int *tablesize)
  * We here are placing a contraint of precendence. We can not have that precendence
  * but in that case all tasks will might face blocking from overload task
  */
-float getOPTTaskResponseTime(struct task *table, int tablesize, struct task *rtask)
+double getOPTTaskResponseTime(struct task *table, int tablesize, struct task *rtask)
 {
 	/*
 	 * Need to consider the task (in overload situation) and all higher
@@ -79,7 +84,8 @@ float getOPTTaskResponseTime(struct task *table, int tablesize, struct task *rta
 	struct task *newtable = NULL;
 	int numEntry = 0;
 	int i;
-	float ret;
+	double ret;
+	struct task *parent;
 
 	newtable = malloc(sizeof(struct task) * tablesize);
 	assert(newtable);
@@ -89,20 +95,27 @@ float getOPTTaskResponseTime(struct task *table, int tablesize, struct task *rta
 		if (table[i].isOverloadTask)
 			continue;
 		copyTask(&newtable[numEntry], &table[i]);
+		assert(table[i].criticality > rtask->criticality);
 		numEntry++;
+	}
+
+	/* Checking if in sorted order according to the criticality */
+	for (; i < tablesize; i++) {
+		assert(table[i].criticality <= rtask->criticality);
 	}
 
 	/* Incase of parent task, we check if the overload task is scheduable */
 	copyTask(&newtable[numEntry++], rtask);
 
 	if (rtask->overload_task) {
+		parent = &newtable[numEntry - 1];
 		copyTask(&newtable[numEntry], rtask->overload_task);
 		/*
 		 * Increase just a bit the criticality of original.
 		 * Make the period of overload task same as parent task
 		 */
-		newtable[numEntry - 1].criticality += 0.1;
-		newtable[numEntry].period_ns = newtable[numEntry - 1].period_ns;
+		parent->criticality += 0.1;
+		newtable[numEntry].period_ns = parent->period_ns;
 		numEntry++;
 	}
 
@@ -118,9 +131,6 @@ float getOPTTaskResponseTime(struct task *table, int tablesize, struct task *rta
 bool admitAllOPTTask(struct task *table, int tablesize)
 {
 	int i;
-
-	/* Sort table with higher criticality tasks at top */
-	qsort(table, tablesize, sizeof(struct task), criticalitySort);
 
 	for (i = 0; i < tablesize; i++) {
 

@@ -2,7 +2,7 @@
 #include "common.h"
 #include <assert.h>
 
-float getCAPATaskResponseTime(struct task *table, int tablesize, struct task *rtask)
+double getCAPATaskResponseTime(struct task *table, int tablesize, struct task *rtask)
 {
 	return getResponseTimeCAPA(table, tablesize, rtask);
 }
