@@ -3,7 +3,7 @@
 #include <time.h>
 #include <stdlib.h>
 
-#define NUM_TASK 3
+#define NUM_TASK 2
 
 #define MAX_PERIOD	100
 
@@ -23,7 +23,7 @@ struct expFunc funcList[] =
 	{
 		.name = "CAPAsched",
 		.func = CAPAIsTaskSched,
-		.printOnFail = false,
+		.printOnFail = true,
 		.printOnCheckFail = false,
 	},
 /*
@@ -34,7 +34,7 @@ struct expFunc funcList[] =
 		.printOnCheckFail = false,
 	},
 */
-/*
+/* Obselete
 	{
 		.name = "PTSchedNavie",
 		.func = PTIsTaskSchedNaive,
@@ -42,10 +42,18 @@ struct expFunc funcList[] =
 		.printOnCheckFail = false,
 	},
 */
+/*
 	{
 		.name = "PTSched",
 		.func = PTIsTaskSched,
 		.printOnFail = true,
+		.printOnCheckFail = false,
+	},
+*/
+	{
+		.name = "ZSRMSSched",
+		.func = ZSRMSIsTaskSched,
+		.printOnFail = false,
 		.printOnCheckFail = false,
 	},
 };

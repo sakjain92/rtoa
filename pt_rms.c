@@ -11,7 +11,7 @@ struct task *PeriodTransformTasks(struct task *table, int *tablesize)
 	/* Sort table with higher criticality tasks at top */
 	qsort(table, *tablesize, sizeof(struct task), criticalitySort);
 
-	for (i = 0; i < *tablesize; i++) {
+	for (i = *tablesize - 1; i >= 0; i--) {
 
 		int n;
 		struct task *rtask = &table[i];

@@ -2,8 +2,6 @@
 #include "common.h"
 #include <assert.h>
 
-//#define DEBUG
-
 
 struct task *OverloadPeriodTransformTasks(struct task *table, int *tablesize)
 {
@@ -18,7 +16,7 @@ struct task *OverloadPeriodTransformTasks(struct task *table, int *tablesize)
 	/* Sort table with higher criticality tasks at top */
 	qsort(table, *tablesize, sizeof(struct task), criticalitySort);
 
-	for (i = 0, numEntry = 0; i < *tablesize; i++) {
+	for (i = *tablesize - 1, numEntry = 0; i >= 0; i--) {
 
 		int n;
 		struct task *rtask = &table[i];
@@ -156,6 +154,33 @@ bool checkOPTTable(struct task *table, int numEntry)
 
 /* Checks if OPT can schedule task */
 bool OPTIsTaskSched(struct task *table, int numEntry, bool *checkPass)
+{
+	bool ret;
+
+	*checkPass = true;
+
+	assert(checkRMTable(table, numEntry));
+
+	table = OverloadPeriodTransformTasks(table, &numEntry);
+	if (table == NULL) {
+		printf("Error in conversion\n");
+		return -1;
+	}
+
+	assert(checkRMTable(table, numEntry));
+
+	if (checkOPTTable(table, numEntry) == false) {
+		*checkPass = false;
+		return false;
+	}
+
+	ret = admitAllOPTTask(table, numEntry);
+
+	return ret;
+}
+
+/* Trying all permutations of variations */
+bool VOPTIsTaskSched(struct task *table, int numEntry, bool *checkPass)
 {
 	bool ret;
 

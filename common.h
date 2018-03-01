@@ -28,7 +28,10 @@ struct task {
 
 float getResponseTimeCAPA(struct task *table, int tablesize, struct task *rtask);
 struct task *parseArgs(int argc, char **argv, int *tablesize);
+
 bool OPTIsTaskSched(struct task *table, int numEntry, bool *checkPass);
+bool VOPTIsTaskSched(struct task *table, int numEntry, bool *checkPass);
+
 bool PTIsTaskSchedNaive(struct task *table, int numEntry, bool *checkPass);
 float getResponseTimeRM(struct task *table, int tablesize,
 						struct task *rtask);
@@ -38,6 +41,7 @@ bool checkRMTable(struct task *table, int tablesize);
 
 bool CAPAIsTaskSched(struct task *table, int numEntry, bool *checkPass);
 bool PTIsTaskSched(struct task *table, int numEntry, bool *checkPass);
+bool ZSRMSIsTaskSched(struct task *table, int numEntry, bool *checkPass);
 
 float getResponseTimePT(struct task *table, int tablesize,
 				struct task *rtask);
