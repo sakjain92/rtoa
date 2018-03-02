@@ -1,6 +1,9 @@
 #include "common.h"
 #include <stdio.h>
 
+// Uncomment to use Experimental formulae for Scheduability
+#define EXP_ZSRMS
+
 static bool isHigherPrioHigherCrit(struct task *rtask, struct task *o) {
 	return ((rtask->period_ns >= o->period_ns) &&
 			(rtask->criticality < o->criticality));
@@ -83,8 +86,51 @@ static double getRMInterference(struct task *table, int tablesize, struct task *
 
 	int idx;
 	int selectedIdx;
-	int numArrivals;
 	double interf=0L;
+
+#ifdef EXP_ZSRMS
+	int fullPeriods;
+	double remainingTime;
+
+	/*
+	 * XXX: This still is not representative of the actual runtime
+	 * Slacks need to be properly calculated. This works only for
+	 * 2 task. For more, a better method is needed otherwise this is too
+	 * pessimistic equation
+	 */
+	idx=0;
+	while((selectedIdx = getNextInSet(table, &idx, tablesize, rtask, isHigherPrioHigherCrit)) >=0){
+		fullPeriods = (int)floorl(Z / table[selectedIdx].period_ns);
+		interf += fullPeriods * table[selectedIdx].nominal_exectime_ns;
+
+		remainingTime = Z - fullPeriods * table[selectedIdx].period_ns;
+		interf += remainingTime < table[selectedIdx].nominal_exectime_ns ?
+			remainingTime : table[selectedIdx].nominal_exectime_ns;
+	}
+
+	idx=0;
+	while((selectedIdx = getNextInSet(table, &idx, tablesize, rtask, isHigherPrioLowerCrit)) >=0){
+		fullPeriods = (int)floorl(Z / table[selectedIdx].period_ns);
+		interf += fullPeriods * table[selectedIdx].exectime_ns;
+
+		remainingTime = Z - fullPeriods * table[selectedIdx].period_ns;
+		interf += remainingTime < table[selectedIdx].exectime_ns ?
+			remainingTime : table[selectedIdx].exectime_ns;
+	}
+
+	idx=0;
+	while((selectedIdx = getNextInSet(table, &idx, tablesize, rtask, isHigherPrioSameCrit)) >=0){
+		fullPeriods = (int)floorl(Z / table[selectedIdx].period_ns);
+		interf += fullPeriods * table[selectedIdx].exectime_ns;
+
+		remainingTime = Z - fullPeriods * table[selectedIdx].period_ns;
+		interf += remainingTime < table[selectedIdx].exectime_ns ?
+			remainingTime : table[selectedIdx].exectime_ns;
+	}
+
+	return interf;
+#else
+	int numArrivals;
 
   	idx=0;
 	while((selectedIdx = getNextInSet(table, &idx, tablesize, rtask, isHigherPrioHigherCrit)) >=0){
@@ -105,6 +151,7 @@ static double getRMInterference(struct task *table, int tablesize, struct task *
 	}
 
 	return interf;
+#endif
 }
 
 static bool getZSRMSTaskResponseTime(struct task *table, int tablesize, struct task *rtask, double *calcZ, double *calcResp)
