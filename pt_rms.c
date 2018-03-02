@@ -2,49 +2,42 @@
 #include "common.h"
 #include <assert.h>
 
-//#define DEBUG
-
-struct task *PeriodTransformTasks(struct task *table, int *tablesize)
+static struct task *PeriodTransformTasks(struct task *table, int *tablesize)
 {
 	int i, j;
 
 	/* Sort table with higher criticality tasks at top */
-	qsort(table, *tablesize, sizeof(struct task), criticalitySort);
+	qsort(table, (size_t)*tablesize, sizeof(struct task), criticalitySort);
 
+	/* Look at tasks in increasing order of criticality */
 	for (i = *tablesize - 1; i >= 0; i--) {
 
-		int n;
 		struct task *rtask = &table[i];
-		double min_period = LONG_MAX;
+		double min_period = (double)LONG_MAX;
+
+		/* Shouldn't be period transformed already */
+		assert(table[i].n == 1);
 
 		for (j = i + 1; j < *tablesize; j++) {
-			min_period = (table[j].period_ns < min_period) ?
-					table[j].period_ns : min_period;
+			double normPeriod = normTaskPeriod(&table[j]);
+			min_period = (normPeriod < min_period) ?
+					normPeriod : min_period;
 		}
 
-		n = min_period < rtask->period_ns ?
-			ceilf(rtask->period_ns / min_period) :
-			1;
-
-		rtask->orig_nominal_exectime_ns = rtask->nominal_exectime_ns;
-		rtask->orig_period_ns = rtask->period_ns;
-
-		rtask->nominal_exectime_ns =
-			rtask->exectime_ns =
-				rtask->exectime_ns / n;
-		rtask->period_ns = rtask->period_ns / n;
+		rtask->n = (int)(min_period < rtask->period_ns ?
+			ceill(rtask->period_ns / min_period) : 1);
 	}
 
 	return table;
 }
 
 /* Naive because not all of the cycles are needed to be ran if not overloading */
-double getPTTaskNaiveResponseTime(struct task *table, int tablesize, struct task *rtask)
+static double getPTTaskNaiveResponseTime(struct task *table, int tablesize, struct task *rtask)
 {
 	return getResponseTimeRM(table, tablesize, rtask);
 }
 
-bool admitAllPTTaskNaive(struct task *table, int tablesize)
+static bool admitAllPTTaskNaive(struct task *table, int tablesize)
 {
 	int i;
 
@@ -67,28 +60,26 @@ bool PTIsTaskSchedNaive(struct task *table, int numEntry, bool *checkPass)
 	/* No checks */
 	*checkPass = true;
 
-	assert(checkRMTable(table, numEntry));
+	assert(checkTable(table, numEntry));
 
 	table = PeriodTransformTasks(table, &numEntry);
 	assert(table);
 
-	assert(checkRMTable(table, numEntry));
+	assert(checkTable(table, numEntry));
 
 	ret = admitAllPTTaskNaive(table, numEntry);
 
 	return ret;
 }
 
-double getPTTaskResponseTime(struct task *table, int tablesize, struct task *rtask)
+static double getPTTaskResponseTime(struct task *table, int tablesize, struct task *rtask)
 {
 	return getResponseTimePT(table, tablesize, rtask);
 }
 
-bool admitAllPTTask(struct task *table, int tablesize)
+static bool admitAllPTTask(struct task *table, int tablesize)
 {
 	int i;
-
-	qsort(table, tablesize, sizeof(struct task), criticalitySort);
 
 	for (i = 0; i < tablesize; i++) {
 
@@ -109,12 +100,12 @@ bool PTIsTaskSched(struct task *table, int numEntry, bool *checkPass)
 	/* No checks */
 	*checkPass = true;
 
-	assert(checkRMTable(table, numEntry));
+	assert(checkTable(table, numEntry));
 
 	table = PeriodTransformTasks(table, &numEntry);
 	assert(table);
 
-	assert(checkRMTable(table, numEntry));
+	assert(checkTable(table, numEntry));
 
 	ret = admitAllPTTask(table, numEntry);
 
@@ -129,14 +120,17 @@ int main(int argc, char **argv)
 	int i, numEntry;
 
 	struct task *table = parseArgs(argc, argv, &numEntry);
-	assert(table);
+	if (table == NULL) {
+		printf("Error in parsing args\n");
+		return -1;
+	}
 
-	assert(checkRMTable(table, numEntry));
+	assert(checkTable(table, numEntry));
 
 	table = PeriodTransformTasks(table, &numEntry);
 	assert(table);
 
-	assert(checkRMTable(table, numEntry));
+	assert(checkTable(table, numEntry));
 
 	/* Sort table with higher criticality tasks at top */
 	qsort(table, numEntry, sizeof(struct task), criticalitySort);
@@ -145,9 +139,9 @@ int main(int argc, char **argv)
 
 		struct task *rtask = &table[i];
 		printf("C:%f,\t C':%f,\t T:%f,\t Crit:%f,\t Scheduability:%f\n",
-				rtask->nominal_exectime_ns,
-				rtask->exectime_ns,
-				rtask->period_ns,
+				normTaskNComp(rtask),
+				normTaskOComp(rtask),
+				normTaskPeriod(rtask),
 				rtask->criticality,
 				getPTTaskResponseTime(table, numEntry, rtask));
 	}

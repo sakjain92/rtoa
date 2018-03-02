@@ -4,7 +4,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-#define NUM_TASK 2
+#define NUM_TASK 4
 
 #define MAX_PERIOD	100
 
@@ -18,20 +18,18 @@ struct expFunc {
 	size_t fails;
 };
 
-int numExp = 0;
-int numUnscheduable = 0;
+static int numExp = 0;
+static int numUnscheduable = 0;
 
-struct expFunc funcList[] =
+static struct expFunc funcList[] =
 {
 
-/*
 	{
 		.name = "RMsched",
 		.func = RMIsTaskSched,
-		.printOnFail = true,
+		.printOnFail = false,
 		.printOnCheckFail = false,
 	},
-*/
 
 	{
 		.name = "CAPAsched",
@@ -40,14 +38,13 @@ struct expFunc funcList[] =
 		.printOnCheckFail = false,
 	},
 
-/*
 	{
 		.name = "OPTSched",
 		.func = OPTIsTaskSched,
 		.printOnFail = false,
 		.printOnCheckFail = false,
 	},
-*/
+
 /* Obselete
 	{
 		.name = "PTSchedNavie",
@@ -56,24 +53,23 @@ struct expFunc funcList[] =
 		.printOnCheckFail = false,
 	},
 */
-/*
+
 	{
 		.name = "PTSched",
 		.func = PTIsTaskSched,
 		.printOnFail = false,
 		.printOnCheckFail = false,
 	},
-*/
+
 	{
 		.name = "ZSRMSSched",
 		.func = ZSRMSIsTaskSched,
 		.printOnFail = false,
 		.printOnCheckFail = false,
 	},
-
 };
 
-void printTaskset(struct task *table, int numEntry)
+static void printTaskset(struct task *table, int numEntry)
 {
 	int i;
 	for (i = 0; i < numEntry; i++) {
@@ -88,11 +84,36 @@ void printTaskset(struct task *table, int numEntry)
 
 }
 
-void compare(struct task *table, int tablesize, double *criticality)
+/* Is it even possible to schedule this taskset */
+static bool isTaskSetPossible(struct task *table, int tablesize)
 {
 	int i;
-	struct task *newtable = malloc(sizeof(struct task) * tablesize);
+	double norm_util, overload_util;
+
+	/* Sort table with higher criticality tasks at top */
+	qsort(table, (size_t)tablesize, sizeof(struct task), criticalitySort);
+
+	/* Check utilization should be less than 1 */
+	for (i = 0, norm_util = 0, overload_util = 0; i < tablesize; i++) {
+		struct task *rtask = &table[i];
+
+		overload_util = norm_util + rtask->exectime_ns / rtask->period_ns;
+		norm_util += rtask->nominal_exectime_ns / rtask->period_ns;
+
+		if (norm_util > 1 || overload_util > 1) {
+			return false;
+		}
+	}
+
+	return true;
+}
+
+static void compare(struct task *table, int tablesize, double *criticality)
+{
+	int i;
+	struct task *newtable = malloc(sizeof(struct task) * (size_t)tablesize);
 	assert(newtable);
+
 	bool pass = false;
 	int fsize = sizeof(funcList)/ sizeof(funcList[0]);
 	bool printReq = false;
@@ -101,10 +122,13 @@ void compare(struct task *table, int tablesize, double *criticality)
 		table[i].criticality = criticality[i];
 	}
 
+	if (isTaskSetPossible(table, tablesize) == false)
+		goto err;
+
 	for (i = 0; i < fsize; i++) {
 		struct expFunc *ef = &funcList[i];
 
-		memcpy(newtable, table, sizeof(struct task) * tablesize);
+		memcpy(newtable, table, sizeof(struct task) * (size_t)tablesize);
 
 		ef->result = ef->func(newtable, tablesize, &ef->checkPass);
 
@@ -115,7 +139,6 @@ void compare(struct task *table, int tablesize, double *criticality)
 		if (ef->result == false && ef->printOnFail == true) {
 			if (!(ef->printOnCheckFail == false && ef->checkPass == false)) {
 				printReq = true;
-
 			}
 		}
 	}
@@ -149,7 +172,7 @@ void compare(struct task *table, int tablesize, double *criticality)
 	numExp++;
 
 	if (numExp % 1000000 == 0) {
-		printf("Num Tasks: %d, Exp Done: %d, Scheduable: %d, Unscheduable: %d (%f%%)\n",
+		printf("Num Tasks: %d, Exp Done: %d, Scheduable: %d, Unscheduable: %d (%.1f%%)\n",
 				NUM_TASK, numExp,
 				numExp - numUnscheduable,
 				numUnscheduable,
@@ -159,20 +182,22 @@ void compare(struct task *table, int tablesize, double *criticality)
 			struct expFunc *ef = &funcList[i];
 			printf("%s:\t Fails: %zd \t(%.1f%%)\n", ef->name, ef->fails, (double)(ef->fails * 100) / (double)(numExp - numUnscheduable));
 		}
+
 		sleep(2);
 	}
 
+err:
 	free(newtable);
 }
 
-void swap(double *a, double *b)
+static void swap(double *a, double *b)
 {
 	double temp = *a;
 	*a = *b;
 	*b = temp;
 }
 
-void permute(double *array, int i, int length,
+static void permute(double *array, int i, int length,
 		void (*func)(struct task *table, int tablesize, double *criticality),
 		struct task *table) {
 
@@ -190,13 +215,15 @@ void permute(double *array, int i, int length,
 	return;
 }
 
-int main()
+int main(int argc, char **argv)
 {
 	double criticality[NUM_TASK];
 	int i;
-	float norm_util;
 
-	srand(time(NULL));
+	(void)argc;
+	(void)argv;
+
+	srand((unsigned int)time(NULL));
 
 	struct task table[NUM_TASK];
 
@@ -211,23 +238,17 @@ int main()
 		for (i = 0; i < NUM_TASK; i++) {
 			struct task *rtask = &table[i];
 			int period, exec;
-			rtask->period_ns = period = (rand() % MAX_PERIOD) + 1;
-			rtask->exectime_ns = exec = (rand() % period) + 1;
+
+			initializeTask(rtask);
+
+			period = (rand() % MAX_PERIOD) + 1;
+			exec = (rand() % period) + 1;
 			rtask->nominal_exectime_ns = (double)(rand() % exec) + 1;
+			rtask->exectime_ns = (double)exec;
+			rtask->period_ns = (double)period;
 		}
 
-		/* Check utilization should be less than 1 */
-		for (i = 0, norm_util = 0; i < NUM_TASK; i++) {
-			struct task *rtask = &table[i];
-			norm_util += rtask->nominal_exectime_ns / rtask->period_ns;
-			if (norm_util > 1) {
-				break;
-			}
-		}
-
-		if (norm_util > 1)
-			continue;
-
+		/* Try all permutations of criticality */
 		permute(criticality, 0, NUM_TASK, compare, table);
 	}
 

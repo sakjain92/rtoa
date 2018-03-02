@@ -2,19 +2,14 @@
 #include "common.h"
 #include <assert.h>
 
-double getRMTaskResponseTime(struct task *table, int tablesize, struct task *rtask)
-{
-	return getResponseTimeRM(table, tablesize, rtask);
-}
-
-bool admitAllRMTask(struct task *table, int tablesize)
+static bool admitAllRMTask(struct task *table, int tablesize)
 {
 	int i;
 
 	for (i = 0; i < tablesize; i++) {
 
 		struct task *rtask = &table[i];
-		if (getRMTaskResponseTime(table, tablesize, rtask) < 0)
+		if (getResponseTimeRM(table, tablesize, rtask) < 0)
 			return false;
 	}
 
@@ -28,7 +23,7 @@ bool RMIsTaskSched(struct task *table, int numEntry, bool *checkPass)
 
 	*checkPass = true;
 
-	assert(checkRMTable(table, numEntry));
+	assert(checkTable(table, numEntry));
 
 	ret = admitAllRMTask(table, numEntry);
 
@@ -44,9 +39,12 @@ int main(int argc, char **argv)
 	int i, numEntry;
 
 	struct task *table = parseArgs(argc, argv, &numEntry);
-	assert(table);
+	if (table == NULL) {
+		printf("Error in parsing args\n");
+		return -1;
+	}
 
-	assert(checkRMTable(table, numEntry));
+	assert(checkTable(table, numEntry));
 
 	/* Sort table with higher criticality tasks at top */
 	qsort(table, numEntry, sizeof(struct task), criticalitySort);

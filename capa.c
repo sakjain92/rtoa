@@ -2,22 +2,14 @@
 #include "common.h"
 #include <assert.h>
 
-double getCAPATaskResponseTime(struct task *table, int tablesize, struct task *rtask)
-{
-	return getResponseTimeCAPA(table, tablesize, rtask);
-}
-
-bool admitAllCAPATask(struct task *table, int tablesize)
+static bool admitAllCAPATask(struct task *table, int tablesize)
 {
 	int i;
-
-	/* Sort table with higher criticality tasks at top */
-	qsort(table, tablesize, sizeof(struct task), criticalitySort);
 
 	for (i = 0; i < tablesize; i++) {
 
 		struct task *rtask = &table[i];
-		if (getCAPATaskResponseTime(table, tablesize, rtask) < 0)
+		if (getResponseTimeCAPA(table, tablesize, rtask) < 0)
 			return false;
 	}
 
@@ -31,7 +23,7 @@ bool CAPAIsTaskSched(struct task *table, int numEntry, bool *checkPass)
 
 	*checkPass = true;
 
-	assert(checkRMTable(table, numEntry));
+	assert(checkTable(table, numEntry));
 
 	ret = admitAllCAPATask(table, numEntry);
 
@@ -47,9 +39,12 @@ int main(int argc, char **argv)
 	int i, numEntry;
 
 	struct task *table = parseArgs(argc, argv, &numEntry);
-	assert(table);
+	if (table == NULL) {
+		printf("Error in parsing args\n");
+		return -1;
+	}
 
-	assert(checkRMTable(table, numEntry));
+	assert(checkTable(table, numEntry));
 
 	/* Sort table with higher criticality tasks at top */
 	qsort(table, numEntry, sizeof(struct task), criticalitySort);

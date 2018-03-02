@@ -1,14 +1,51 @@
 #include "common.h"
 #include <stdio.h>
 
-int isHigherPrio(struct task *rtask, struct task *other)
+/*
+ * TODO: Double can have rounding errors which can be significant as we use
+ * floor() and ceil() functions
+ */
+
+/*
+ * TODO: Check the tie breaking in RMS if same periods
+ */
+
+double normTaskPeriod(struct task *rtask)
 {
-	if (rtask->period_ns > other->period_ns)
+	/* Not period transforming the overload task */
+	assert(rtask->is_overload_task == false || rtask->n == 1);
+	return ((double)rtask->period_ns) / rtask->n;
+}
+
+double normTaskNComp(struct task *rtask)
+{
+	assert(rtask->is_overload_task == false || rtask->n == 1);
+	return ((double)rtask->nominal_exectime_ns) / rtask->n;
+}
+
+double normTaskOComp(struct task *rtask)
+{
+	assert(rtask->is_overload_task == false || rtask->n == 1);
+	return ((double)rtask->exectime_ns) / rtask->n;
+}
+
+/*
+ * Is other task higher prior than ref task
+ * Currently we can't have two tasks with same criticality and same priority
+ * Because we don't know how to break ties in that case
+ */
+static bool isHigherPrio(struct task *rtask, struct task *other)
+{
+	double rtask_period = normTaskPeriod(rtask);
+	double other_period = normTaskPeriod(other);
+
+	assert(!((rtask_period == other_period) &&
+				(rtask->criticality == other->criticality)));
+
+	if (rtask_period > other_period)
 		return true;
-	if (rtask->period_ns == other->period_ns) {
-		if (rtask->criticality == other->criticality)
-			while(1);
-		assert(rtask->criticality != other->criticality);
+
+	if (rtask_period == other_period) {
 		if (rtask->criticality < other->criticality)
 			return true;
 	}
@@ -16,16 +53,20 @@ int isHigherPrio(struct task *rtask, struct task *other)
 	return false;
 }
 
-int isHigherCrit(struct task *rtask, struct task *other)
+/* Is other task higher criticality than ref task */
+static bool isHigherCrit(struct task *rtask, struct task *other)
 {
-	assert(!((rtask->period_ns == other->period_ns) &&
+	double rtask_period = normTaskPeriod(rtask);
+	double other_period = normTaskPeriod(other);
+
+	assert(!((rtask_period == other_period) &&
 			(rtask->criticality == other->criticality)));
 
 	if (rtask->criticality < other->criticality) {
 		return true;
 	} else if (rtask->criticality > other->criticality) {
 		return false;
-	} else if (rtask->period_ns > other->period_ns) {
+	} else if (rtask_period > other_period) {
 		return true;
 	}
 
@@ -34,7 +75,7 @@ int isHigherCrit(struct task *rtask, struct task *other)
 
 
 int getNextInSet(struct task *table, int *sidx, int tablesize,
-		struct task *rtask, int (*inSet)(struct task *r, struct task *o))
+		struct task *rtask, bool (*inSet)(struct task *r, struct task *o))
 {
 	int selectedIdx=-1;
 
@@ -62,6 +103,15 @@ int getNextInSet(struct task *table, int *sidx, int tablesize,
 	return selectedIdx;
 }
 
+void initializeTask(struct task *rtask)
+{
+	rtask->n = 1;
+	rtask->nominal_exectime_ns =
+		rtask->exectime_ns = rtask->period_ns = rtask->criticality = -1;
+	rtask->overload_task = NULL;
+	rtask->is_overload_task = false;
+}
+
 struct task *parseArgs(int argc, char **argv, int *tablesize)
 {
 	struct task *table;
@@ -74,16 +124,20 @@ struct task *parseArgs(int argc, char **argv, int *tablesize)
 	if (numEntry < 1)
 		return NULL;
 
-	table = malloc(sizeof(struct task) * numEntry);
+	table = malloc(sizeof(struct task) * (size_t)numEntry);
 	if (table == NULL)
 		return NULL;
 
-	bzero(table, sizeof(struct task) * numEntry);
+	bzero(table, sizeof(struct task) * (size_t)numEntry);
 
 	/* Order is C,Co,T,Criticality */
 	argv++;
 	for (i = 0; i < numEntry; i++) {
+
 		const char *s = argv[i];
+
+		initializeTask(&table[i]);
+
 		field = 0;
 		do {
 			size_t field_len = strcspn(s, delims);
@@ -142,6 +196,10 @@ double getResponseTimeRM(struct task *table, int tablesize,
 	int idx=0;
 	int selectedIdx=-1;
 
+	/* Use this function for simple cases only */
+	assert(rtask->overload_task == NULL);
+	assert(rtask->n == 1);
+
 	resp = rtask->exectime_ns;
 
 	while (firsttime || (resp > prevResp && resp <= rtask->period_ns)){
@@ -153,7 +211,7 @@ double getResponseTimeRM(struct task *table, int tablesize,
     		// get interference from Higher Priority
 		idx=0;
 		while((selectedIdx = getNextInSet(table, &idx, tablesize, rtask, isHigherPrio)) >=0) {
-			numArrivals = ceilf(prevResp / table[selectedIdx].period_ns);
+			numArrivals = (int)ceill(prevResp / table[selectedIdx].period_ns);
 			resp += numArrivals * table[selectedIdx].nominal_exectime_ns;
     		}
 	}
@@ -174,6 +232,10 @@ double getResponseTimeCAPA(struct task *table, int tablesize,
 	int idx=0;
 	int selectedIdx=-1;
 
+	/* Use this function for simple cases only */
+	assert(rtask->overload_task == NULL);
+	assert(rtask->n == 1);
+
 	resp = rtask->exectime_ns;
 
 	while (firsttime || (resp > prevResp && resp <= rtask->period_ns)){
@@ -185,7 +247,7 @@ double getResponseTimeCAPA(struct task *table, int tablesize,
     		// get interference from Higher Criticality
 		idx=0;
 		while((selectedIdx = getNextInSet(table, &idx, tablesize, rtask, isHigherCrit)) >=0) {
-			numArrivals = ceilf(prevResp / table[selectedIdx].period_ns);
+			numArrivals = (int)ceill(prevResp / table[selectedIdx].period_ns);
 			resp += numArrivals * table[selectedIdx].nominal_exectime_ns;
     		}
 	}
@@ -196,6 +258,11 @@ double getResponseTimeCAPA(struct task *table, int tablesize,
   	return resp;
 }
 
+/*
+ * TODO: There is another way to schedule tasks in case of OPT.
+ * We here are placing a contraint of precendence. We can not have that precendence
+ * but in that case all tasks will might face blocking from overload task
+ */
 double getResponseTimePT(struct task *table, int tablesize,
 				struct task *rtask)
 {
@@ -206,34 +273,41 @@ double getResponseTimePT(struct task *table, int tablesize,
 	int idx=0;
 	int selectedIdx=-1;
 
-	resp = rtask->exectime_ns;
+	resp = normTaskOComp(rtask) + ((rtask->overload_task == NULL) ? 0 : normTaskOComp(rtask->overload_task));
 
 	while (firsttime || (resp > prevResp && resp <= rtask->period_ns)){
 
 		firsttime=0;
 		prevResp = resp;
-		resp = rtask->exectime_ns;
+
+		resp = normTaskOComp(rtask) + ((rtask->overload_task == NULL) ? 0 : normTaskOComp(rtask->overload_task));
 
     		// get interference from Higher Priority
 		idx=0;
 		while((selectedIdx = getNextInSet(table, &idx, tablesize, rtask, isHigherPrio)) >=0) {
+
+			int fullPeriods;
+			double remainderTime;
+			double last_period_exec;
+			double orig_period = table[selectedIdx].period_ns;
+			double orig_nominal_exectime = table[selectedIdx].nominal_exectime_ns;
+			int n = table[selectedIdx].n;
+
 			/* Higher priority wouldn't overload but might run at higher period */
-			double n = table[selectedIdx].orig_period_ns / table[selectedIdx].period_ns;
+			fullPeriods = (int)floorl(prevResp / orig_period);
+			resp += fullPeriods * orig_nominal_exectime;
 
-			int fullPeriods = floorf(prevResp / table[selectedIdx].period_ns);
-			resp += fullPeriods * (table[selectedIdx].orig_nominal_exectime_ns / n);
+			remainderTime = prevResp - fullPeriods * orig_period;
 
-			int remainderTime = prevResp - fullPeriods * table[selectedIdx].period_ns;
-
-			/* XXX: Is this higher than neccesary? */
-			numArrivals = ceilf(remainderTime / table[selectedIdx].period_ns);
-			int add = numArrivals * table[selectedIdx].nominal_exectime_ns;
-			resp += add > (table[selectedIdx].orig_nominal_exectime_ns / n)?
-				(table[selectedIdx].orig_nominal_exectime_ns / n): add;
+			/* How many PT task comes in the remaining time? */
+			numArrivals = (int)ceill((remainderTime * n) / orig_period);
+			last_period_exec = numArrivals * table[selectedIdx].exectime_ns;
+			resp += last_period_exec > orig_nominal_exectime ?
+				orig_nominal_exectime : last_period_exec;
 		}
 	}
 
-	if (resp > rtask->period_ns)
+	if (resp > normTaskPeriod(rtask))
 		return -1;
 
   	return resp;
@@ -246,8 +320,8 @@ double getResponseTimePT(struct task *table, int tablesize,
  */
 int criticalitySort(const void *a, const void *b)
 {
-	struct task *rtask = (struct task *)a;
-	struct task *o = (struct task *)b;
+	const struct task *rtask = (const struct task *)a;
+	const struct task *o = (const struct task *)b;
 
 	double diff = o->criticality - rtask->criticality;
 	if (diff < 0)
@@ -266,22 +340,52 @@ void copyTask(struct task *dest, struct task *src)
 	memcpy(dest, src, sizeof(struct task));
 }
 
-bool checkRMTable(struct task *table, int tablesize)
+/* Checks properties of task */
+static bool checkProp(struct task *rtask)
+{
+	bool ret;
+
+	if (rtask->n < 1)
+		return false;
+
+	if (rtask->nominal_exectime_ns <= 0)
+		return false;
+
+	if (rtask->exectime_ns < rtask->nominal_exectime_ns)
+		return false;
+
+	if (rtask->period_ns < rtask->exectime_ns)
+		return false;
+
+	if (rtask->is_overload_task == true && rtask->overload_task != NULL)
+		return false;
+
+	if (rtask->criticality <= 0)
+		return false;
+
+	if (rtask->overload_task != NULL) {
+		ret = checkProp(rtask->overload_task);
+		if (ret == false)
+			return false;
+	}
+
+	return true;
+}
+
+/* Checks basic property of the entries in the table */
+bool checkTable(struct task *table, int tablesize)
 {
 	int i;
+	bool ret;
+
 	if (tablesize <= 0)
 		return false;
 
 	for (i = 0; i < tablesize; i++) {
 		struct task *rtask = &table[i];
 
-		if (rtask->nominal_exectime_ns <= 0)
-			return false;
-
-		if (rtask->exectime_ns < rtask->nominal_exectime_ns)
-			return false;
-
-		if (rtask->period_ns < rtask->exectime_ns)
+		ret = checkProp(rtask);
+		if (ret == false)
 			return false;
 	}
 

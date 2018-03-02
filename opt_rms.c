@@ -2,142 +2,64 @@
 #include "common.h"
 #include <assert.h>
 
-
-struct task *OverloadPeriodTransformTasks(struct task *table, int *tablesize)
+static struct task *OverloadPeriodTransformTasks(struct task *table, int *tablesize)
 {
-	int i, j, k;
-	struct task *newtable = NULL;
-	int numEntry = 0;
-	struct task *overload_task;
-
-	newtable = malloc(sizeof(struct task) * 2 * *tablesize);
-	assert(newtable);
+	int i, j;
 
 	/* Sort table with higher criticality tasks at top */
-	qsort(table, *tablesize, sizeof(struct task), criticalitySort);
+	qsort(table, (size_t)*tablesize, sizeof(struct task), criticalitySort);
 
-	for (i = 0, numEntry = *tablesize; i < *tablesize; i++) {
-
-		struct task *rtask = &table[i];
-		if (rtask->nominal_exectime_ns != rtask->exectime_ns)
-			numEntry++;
-	}
-
-	for (i = *tablesize - 1, k = numEntry - 1; i >= 0; i--) {
+	/* Look at tasks in increasing order of criticality */
+	for (i = *tablesize - 1; i >= 0; i--) {
 
 		int n;
 		struct task *rtask = &table[i];
-		double min_period = LONG_MAX;
+		double min_period = (double)LONG_MAX;
 
-		for (j = k + 1; j < numEntry; j++) {
-			min_period = (newtable[j].period_ns < min_period) ?
-					newtable[j].period_ns : min_period;
+		/* Shouldn't be period transformed already */
+		assert(table[i].n == 1);
+		assert(table[i].overload_task == NULL &&
+				table[i].is_overload_task == false);
+
+		for (j = i + 1; j < *tablesize; j++) {
+			double normPeriod = normTaskPeriod(&table[j]);
+			min_period = (normPeriod < min_period) ?
+					normPeriod : min_period;
 		}
 
-		n = min_period < rtask->period_ns ?
-			ceilf(rtask->period_ns / min_period) :
-			1;
+		rtask->n = n = (int)(min_period < rtask->period_ns ?
+			ceill(rtask->period_ns / min_period) : 1);
 
-		overload_task = NULL;
-		if (rtask->nominal_exectime_ns != rtask->exectime_ns) {
+		if ((n != 1) && (rtask->nominal_exectime_ns != rtask->exectime_ns)) {
+			struct task *ov_task;
 
-			copyTask(&newtable[k], rtask);
+			ov_task = rtask->overload_task = malloc(sizeof(struct task));
+			assert(ov_task);
 
-			newtable[k].nominal_exectime_ns =
-				newtable[k].exectime_ns =
+			copyTask(ov_task, rtask);
+
+			ov_task->n = 1;
+			ov_task->nominal_exectime_ns =
+				ov_task->exectime_ns =
 				rtask->exectime_ns - rtask->nominal_exectime_ns;
+			ov_task->is_overload_task = true;
+			ov_task->overload_task = NULL;
 
-			newtable[k].isOverloadTask = true;
-			newtable[k].overload_task = NULL;
-			overload_task = &newtable[k];
-			k--;
+			rtask->exectime_ns = rtask->nominal_exectime_ns;
 		}
-
-		copyTask(&newtable[k], rtask);
-		newtable[k].nominal_exectime_ns =
-			newtable[k].exectime_ns =
-			rtask->nominal_exectime_ns / n;
-		newtable[k].period_ns = rtask->period_ns / n;
-		newtable[k].overload_task = overload_task;
-		newtable[k].isOverloadTask = false;
-		k--;
 	}
 
-	assert(k == -1);
-
-	*tablesize = numEntry;
-	return newtable;
+	return table;
 }
 
-
-/*
- * TODO: There is another way to schedule tasks.
- * We here are placing a contraint of precendence. We can not have that precendence
- * but in that case all tasks will might face blocking from overload task
- */
-double getOPTTaskResponseTime(struct task *table, int tablesize, struct task *rtask)
-{
-	/*
-	 * Need to consider the task (in overload situation) and all higher
-	 * criticality task (in non overloaded state)
-	 */
-	struct task *newtable = NULL;
-	int numEntry = 0;
-	int i;
-	double ret;
-	struct task *parent;
-
-	newtable = malloc(sizeof(struct task) * tablesize);
-	assert(newtable);
-	assert(!rtask->isOverloadTask);
-
-	for (i = 0, numEntry = 0; &table[i] != rtask; i++) {
-		if (table[i].isOverloadTask)
-			continue;
-		copyTask(&newtable[numEntry], &table[i]);
-		assert(table[i].criticality > rtask->criticality);
-		numEntry++;
-	}
-
-	/* Checking if in sorted order according to the criticality */
-	for (; i < tablesize; i++) {
-		assert(table[i].criticality <= rtask->criticality);
-	}
-
-	/* Incase of parent task, we check if the overload task is scheduable */
-	copyTask(&newtable[numEntry++], rtask);
-
-	if (rtask->overload_task) {
-		parent = &newtable[numEntry - 1];
-		copyTask(&newtable[numEntry], rtask->overload_task);
-		/*
-		 * Increase just a bit the criticality of original.
-		 * Make the period of overload task same as parent task
-		 */
-		parent->criticality += 0.1;
-		newtable[numEntry].period_ns = parent->period_ns;
-		numEntry++;
-	}
-
-	ret = getResponseTimeRM(newtable, numEntry, &newtable[numEntry - 1]);
-	free(newtable);
-
-	if (ret > rtask->period_ns)
-		ret = -1;
-
-	return ret;
-}
-
-bool admitAllOPTTask(struct task *table, int tablesize)
+static bool admitAllOPTTask(struct task *table, int tablesize)
 {
 	int i;
 
 	for (i = 0; i < tablesize; i++) {
 
 		struct task *rtask = &table[i];
-		if (rtask->isOverloadTask)
-			continue;
-		if (getOPTTaskResponseTime(table, tablesize, rtask) < 0)
+		if (getResponseTimePT(table, tablesize, rtask) < 0)
 			return false;
 	}
 
@@ -146,22 +68,34 @@ bool admitAllOPTTask(struct task *table, int tablesize)
 
 
 /* Does a neccesary check on all tasks */
-bool checkOPTTable(struct task *table, int numEntry)
+static bool checkOPTTable(struct task *table, int numEntry)
 {
 	int i;
 
+	/* Check if scheduable in last period of PT with overload */
 	for (i = 0; i < numEntry; i++) {
 		struct task *rtask = &table[i];
-		if (!rtask->overload_task)
+		if (rtask->overload_task == NULL)
 			continue;
-		if (rtask->overload_task->nominal_exectime_ns + rtask->nominal_exectime_ns >
-				rtask->period_ns)
+		if (normTaskOComp(rtask->overload_task) + normTaskOComp(rtask) >
+				normTaskPeriod(rtask))
 			return false;
 	}
 
 	return true;
 }
 
+static void OPTTableCleanup(struct task *table, int numEntry)
+{
+	int i;
+
+	for (i = 0; i < numEntry; i++) {
+		if (table[i].overload_task != NULL) {
+			free(table[i].overload_task);
+			table[i].overload_task = NULL;
+		}
+	}
+}
 /* Checks if OPT can schedule task */
 bool OPTIsTaskSched(struct task *table, int numEntry, bool *checkPass)
 {
@@ -169,50 +103,22 @@ bool OPTIsTaskSched(struct task *table, int numEntry, bool *checkPass)
 
 	*checkPass = true;
 
-	assert(checkRMTable(table, numEntry));
+	assert(checkTable(table, numEntry));
 
 	table = OverloadPeriodTransformTasks(table, &numEntry);
-	if (table == NULL) {
-		printf("Error in conversion\n");
-		return -1;
-	}
 
-	assert(checkRMTable(table, numEntry));
+	assert(checkTable(table, numEntry));
 
 	if (checkOPTTable(table, numEntry) == false) {
 		*checkPass = false;
-		return false;
+		ret = false;
+		goto err;
 	}
 
 	ret = admitAllOPTTask(table, numEntry);
 
-	return ret;
-}
-
-/* Trying all permutations of variations */
-bool VOPTIsTaskSched(struct task *table, int numEntry, bool *checkPass)
-{
-	bool ret;
-
-	*checkPass = true;
-
-	assert(checkRMTable(table, numEntry));
-
-	table = OverloadPeriodTransformTasks(table, &numEntry);
-	if (table == NULL) {
-		printf("Error in conversion\n");
-		return -1;
-	}
-
-	assert(checkRMTable(table, numEntry));
-
-	if (checkOPTTable(table, numEntry) == false) {
-		*checkPass = false;
-		return false;
-	}
-
-	ret = admitAllOPTTask(table, numEntry);
-
+err:
+	OPTTableCleanup(table, numEntry);
 	return ret;
 }
 
@@ -225,14 +131,17 @@ int main(int argc, char **argv)
 	int i, numEntry;
 
 	struct task *table = parseArgs(argc, argv, &numEntry);
-	assert(table);
+	if (table == NULL) {
+		printf("Error in parsing args\n");
+		return -1;
+	}
 
-	assert(checkRMTable(table, numEntry));
+	assert(checkTable(table, numEntry));
 
 	table = OverloadPeriodTransformTasks(table, &numEntry);
 	assert(table);
 
-	assert(checkRMTable(table, numEntry));
+	assert(checkTable(table, numEntry));
 
 	/* Sort table with higher criticality tasks at top */
 	qsort(table, numEntry, sizeof(struct task), criticalitySort);
@@ -241,14 +150,29 @@ int main(int argc, char **argv)
 
 		struct task *rtask = &table[i];
 		printf("C:%f,\t C':%f,\t T:%f,\t Crit:%f,\t Scheduability:%f\n",
-				rtask->nominal_exectime_ns,
-				rtask->exectime_ns,
-				rtask->period_ns,
+				normTaskNComp(rtask),
+				normTaskOComp(rtask),
+				normTaskPeriod(rtask),
 				rtask->criticality,
-				rtask->isOverloadTask ? 0 : getOPTTaskResponseTime(table, numEntry, rtask));
+				getOPTTaskResponseTime(table, numEntry, rtask));
+
+		if (rtask->overload_task != NULL) {
+
+			assert(rtask->overload_task->n == 1);
+
+			printf("C:%f,\t C':%f,\t T:%f,\t Crit:%f,\t Scheduability:--\n",
+					normTaskNComp(rtask->overload_task),
+					normTaskOComp(rtask->overload_task),
+					normTaskPeriod(rtask->overload_task),
+					rtask->overload_task->criticality;
+		}
 	}
 
 	printf("OPT admit all: %d\n", admitAllOPTTask(table, numEntry));
+
+	printf("Check: %s\n", checkOPTTable(table, numEntry) == true ? "PASS" : "FAIL");
+
+	OPTTableCleanup(table, numEntry);
 
 	free(table);
 	return 0;

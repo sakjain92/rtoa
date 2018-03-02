@@ -20,29 +20,6 @@ static bool isHigherPrioLowerCrit(struct task *rtask, struct task *o) {
 	return ((rtask->period_ns >= o->period_ns) && (rtask->criticality > o->criticality));
 }
 
-static int getNextInSet(struct task *table, int *cidx, int tablesize,
-		struct task *rtask,
-		bool (*inSet)(struct task *rtask, struct task *o)) {
-
-	int selectedIdx=-1;
-
-	if (*cidx < 0)
-		return -1;
-
-	while ((*cidx < tablesize) &&
-		(rtask ==  &table[*cidx] ||
-		 !inSet(rtask, &table[*cidx]))) {
-		*cidx +=1;
-	}
-
-	if (*cidx <tablesize){
-		selectedIdx = *cidx;
-		*cidx+=1;
-	}
-
-	return selectedIdx;
-}
-
 static double getExecTimeHigherPrioHigherCrit(struct task *rtask) {
 	return rtask->nominal_exectime_ns;
 }
@@ -60,7 +37,7 @@ static double getResponseTimeCritNs(struct task *table, int tablesize, struct ta
 	int firsttime=1;
 	double resp=0L;
 	double prevResp=0L;
-	size_t numArrivals=0l;
+	int numArrivals=0l;
 	int idx=0;
 	int selectedIdx=-1;
 
@@ -78,7 +55,7 @@ static double getResponseTimeCritNs(struct task *table, int tablesize, struct ta
 
 		while((selectedIdx = getNextInSet(table, &idx, tablesize, rtask, isHigherPrioHigherCrit)) >=0){
 
-			numArrivals = ceilf(prevResp / table[selectedIdx].period_ns);
+			numArrivals = (int)ceill(prevResp / table[selectedIdx].period_ns);
 			resp += numArrivals * getExecTimeHigherPrioHigherCrit(&table[selectedIdx]);
 		}
 
@@ -86,7 +63,7 @@ static double getResponseTimeCritNs(struct task *table, int tablesize, struct ta
 		idx=0;
 		while((selectedIdx = getNextInSet(table, &idx, tablesize, rtask, isLowerPrioHigherCrit)) >=0){
 
-			numArrivals = ceilf(prevResp / table[selectedIdx].period_ns);
+			numArrivals = (int)ceill(prevResp / table[selectedIdx].period_ns);
 			resp += numArrivals * getExecTimeLowerPrioHigherCrit(&table[selectedIdx]);
 		}
 
@@ -94,42 +71,43 @@ static double getResponseTimeCritNs(struct task *table, int tablesize, struct ta
 		idx=0;
 		while((selectedIdx = getNextInSet(table, &idx, tablesize, rtask, isHigherPrioSameCrit)) >=0){
 
-			numArrivals = ceilf(prevResp / table[selectedIdx].period_ns);
+			numArrivals = (int)ceill(prevResp / table[selectedIdx].period_ns);
       			resp += numArrivals * getExecTimeHigherPrioSameCrit(&table[selectedIdx]);
 		}
   	}
   	return resp;
 }
 
+/* TODO: This is overly pessimistic */
 static double getRMInterference(struct task *table, int tablesize, struct task *rtask, double Z) {
 
 	int idx;
 	int selectedIdx;
-	size_t numArrivals;
+	int numArrivals;
 	double interf=0L;
 
   	idx=0;
 	while((selectedIdx = getNextInSet(table, &idx, tablesize, rtask, isHigherPrioHigherCrit)) >=0){
-		numArrivals = ceilf(Z / table[selectedIdx].period_ns);
+		numArrivals = (int)ceill(Z / table[selectedIdx].period_ns);
 		interf += numArrivals * table[selectedIdx].nominal_exectime_ns;
 	}
 
 	idx=0;
 	while((selectedIdx = getNextInSet(table, &idx, tablesize, rtask, isHigherPrioLowerCrit)) >=0){
-		numArrivals = ceilf(Z / table[selectedIdx].period_ns);
+		numArrivals = (int)ceill(Z / table[selectedIdx].period_ns);
 		interf += numArrivals * table[selectedIdx].exectime_ns;
 	}
 
 	idx=0;
 	while((selectedIdx = getNextInSet(table, &idx, tablesize, rtask, isHigherPrioSameCrit)) >=0){
-		numArrivals = ceilf(Z / table[selectedIdx].period_ns);
+		numArrivals = (int)ceill(Z / table[selectedIdx].period_ns);
 		interf += numArrivals * table[selectedIdx].exectime_ns;
 	}
 
 	return interf;
 }
 
-bool getZSRMSTaskResponseTime(struct task *table, int tablesize, struct task *rtask, double *calcZ, double *calcResp)
+static bool getZSRMSTaskResponseTime(struct task *table, int tablesize, struct task *rtask, double *calcZ, double *calcResp)
 {
 	double resp=0L;
 	double Z=0L;
@@ -194,13 +172,13 @@ bool getZSRMSTaskResponseTime(struct task *table, int tablesize, struct task *rt
 	return (rtask->period_ns >= resp);
 }
 
-bool admitAllZSRMSTask(struct task *table, int tablesize)
+static bool admitAllZSRMSTask(struct task *table, int tablesize)
 {
 	int i;
 	double Z, resp;
 
 	/* Sort table with higher criticality tasks at top */
-	qsort(table, tablesize, sizeof(struct task), criticalitySort);
+	qsort(table, (size_t)tablesize, sizeof(struct task), criticalitySort);
 
 	for (i = 0; i < tablesize; i++) {
 
@@ -219,7 +197,7 @@ bool ZSRMSIsTaskSched(struct task *table, int numEntry, bool *checkPass)
 
 	*checkPass = true;
 
-	assert(checkRMTable(table, numEntry));
+	assert(checkTable(table, numEntry));
 
 	ret = admitAllZSRMSTask(table, numEntry);
 
@@ -237,9 +215,12 @@ int main(int argc, char **argv)
 	bool isSched;
 
 	struct task *table = parseArgs(argc, argv, &numEntry);
-	assert(table);
+	if (table == NULL) {
+		printf("Error in parsing args\n");
+		return -1;
+	}
 
-	assert(checkRMTable(table, numEntry));
+	assert(checkTable(table, numEntry));
 
 	/* Sort table with higher criticality tasks at top */
 	qsort(table, numEntry, sizeof(struct task), criticalitySort);
