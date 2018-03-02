@@ -1,0 +1,68 @@
+Real Time Overload conditions Analysis
+
+
+This is a framework to compare multiple scheduling algorithms in overloaded
+conditions.
+
+In overloaded conditions in mixed criticality systems, if a higher criticality
+task overloads, then lower criticality task may/maynot meets it's deadline.
+
+Following algorithms are supported:
+1) RMS - Rate monotonic scheduling
+2) CAPA - Criticality as Priority
+3) PT_RMS - Period Transform and use RMS
+4) OPT_RMS - Same as PT_RMS but period transform is done differently leading to
+different results
+5) ZS-RMS - Zero slack RMS
+
+Each algorithm is given a set of tasks as input which forms the taskset.
+Each task is of form (C, Co, T, Crit), where
+C = normal mode worst case execution time
+Co = overload mode worst case execution time
+T = Time period
+Crit = Criticality of task (Higher the value, higher the criticality)
+
+---- NOTE: Currently we don't support multiple tasks of same criticality ----
+
+This codebase can be used in two modes:
+
+1) Individual Algorithms:
+In this mode, individual algorithms can be ran and tested seperately.
+E.g. to run PT_RMS, do the following:
+
+make pt_rms				# Look at Makefile to see all algos
+./pt_rms.elf 2,6,10,2 4,4,5,1		# Runs two tasksets
+					# 1) (C=2, Co=6, T=10, Crit=2) &&
+					# 2) (C=4, Co=4, T=5, Crit=1)
+make clean
+
+2) Comparision modes:
+
+In this mode, the codebase creates multiple random tasksets and feed them to
+multiple algorithms. The constraints on tasksets is that utilization of tasksets
+should not be greater than 1 (in both normal and overload condition). Stats about
+results are periodically printed on screen. No inputs are needed.
+
+Currently, in this mode, inputs are not taken by the elf (i.e. argv is not used),
+instead user can cusrtomize main.c. Specifically only funcList[] and NUM_TASK
+needs to be modified.
+
+NUM_TASK specify how many tasks in taskset.
+
+funcList[] specify which all algorithms to run (User can comment out
+algortihms which are not needed).
+
+In each element of funcList[], if printOnFail option is true, then
+if the codebase finds any taskset schedulable by any given algorithm but not this
+element's algorithm, then it prints out the taskset.
+
+If printOnCheckFail is false, then even if an algorithm fails to schedule a
+scheduable taskset, then it doesn't print on screen if the taskset doesn't
+fulfill a neccesary condition for the algorithm (Presently this is useful only
+for OPT)
+
+To run this mode,
+
+make
+./exp.elf
+make clean

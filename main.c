@@ -4,7 +4,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-#define NUM_TASK 4
+#define NUM_TASK 3
 
 #define MAX_PERIOD	100
 
@@ -13,6 +13,8 @@ struct expFunc {
 	bool (*func)(struct task *table, int tablesize, bool *checkPass);
 	bool printOnFail;
 	bool printOnCheckFail;
+
+	/* Stats collected during runtime */
 	bool result;
 	bool checkPass;
 	size_t fails;
@@ -45,15 +47,6 @@ static struct expFunc funcList[] =
 		.printOnCheckFail = false,
 	},
 
-/* Obselete
-	{
-		.name = "PTSchedNavie",
-		.func = PTIsTaskSchedNaive,
-		.printOnFail = false,
-		.printOnCheckFail = false,
-	},
-*/
-
 	{
 		.name = "PTSched",
 		.func = PTIsTaskSched,
@@ -67,6 +60,15 @@ static struct expFunc funcList[] =
 		.printOnFail = false,
 		.printOnCheckFail = false,
 	},
+
+#if 0 /* Obselete */
+	{
+		.name = "PTSchedNavie",
+		.func = PTIsTaskSchedNaive,
+		.printOnFail = false,
+		.printOnCheckFail = false,
+	},
+#endif
 };
 
 static void printTaskset(struct task *table, int numEntry)
