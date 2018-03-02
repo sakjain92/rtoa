@@ -10,20 +10,20 @@
  * TODO: Check the tie breaking in RMS if same periods
  */
 
-double normTaskPeriod(struct task *rtask)
+double normTaskPeriod(const struct task *rtask)
 {
 	/* Not period transforming the overload task */
 	assert(rtask->is_overload_task == false || rtask->n == 1);
 	return ((double)rtask->period_ns) / rtask->n;
 }
 
-double normTaskNComp(struct task *rtask)
+double normTaskNComp(const struct task *rtask)
 {
 	assert(rtask->is_overload_task == false || rtask->n == 1);
 	return ((double)rtask->nominal_exectime_ns) / rtask->n;
 }
 
-double normTaskOComp(struct task *rtask)
+double normTaskOComp(const struct task *rtask)
 {
 	assert(rtask->is_overload_task == false || rtask->n == 1);
 	return ((double)rtask->exectime_ns) / rtask->n;
@@ -330,6 +330,24 @@ int criticalitySort(const void *a, const void *b)
 		return 1;
 
 	return 0;
+}
+
+/*
+ * Used by qsort to sort by priority in increasing order
+ * Higher priority is denoted by lower period
+ */
+int incPrioritySort(const void *a, const void *b)
+{
+	const struct task *rtask = (const struct task *)a;
+	const struct task *o = (const struct task *)b;
+
+	if (normTaskPeriod(o) > normTaskPeriod(rtask)) {
+		return 1;
+	} else if (normTaskPeriod(o) == normTaskPeriod(rtask)) {
+		return 0;
+	}
+
+	return -1;
 }
 
 /*

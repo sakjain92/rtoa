@@ -32,10 +32,10 @@ struct task {
 	bool is_overload_task;
 };
 
-double normTaskPeriod(struct task *rtask);
-double normTaskNComp(struct task *rtask);
-double normTaskOComp(struct task *rtask);
-
+double normTaskPeriod(const struct task *rtask);
+double normTaskNComp(const struct task *rtask);
+double normTaskOComp(const struct task *rtask);
+int incPrioritySort(const void *a, const void *b);
 
 int getNextInSet(struct task *table, int *sidx, int tablesize,
 		struct task *rtask, bool (*inSet)(struct task *r, struct task *o));

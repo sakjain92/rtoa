@@ -4,9 +4,17 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-#define NUM_TASK 3
+/* Define characteristics of task */
+#define NUM_TASK		2
+#define NON_OVERLOAD_SCENARIO	false	/* true OR false - default false */
+#define MAX_PERIOD		100
+#define CRITICALITY_AS_PRIO	false	/* true OR false - default false */
 
-#define MAX_PERIOD	100
+/*
+ * XXX: Criticality as prio option is not working currently.
+ * Do all devolve into RMS when tasksets are criticality as prio?
+ * Even ZS-RMS
+ */
 
 struct expFunc {
 	char *name;
@@ -22,6 +30,8 @@ struct expFunc {
 
 static int numExp = 0;
 static int numUnscheduable = 0;
+static bool non_overload_scenrio = NON_OVERLOAD_SCENARIO;
+static bool crit_as_prio = CRITICALITY_AS_PRIO;
 
 static struct expFunc funcList[] =
 {
@@ -99,8 +109,8 @@ static bool isTaskSetPossible(struct task *table, int tablesize)
 	for (i = 0, norm_util = 0, overload_util = 0; i < tablesize; i++) {
 		struct task *rtask = &table[i];
 
-		overload_util = norm_util + rtask->exectime_ns / rtask->period_ns;
-		norm_util += rtask->nominal_exectime_ns / rtask->period_ns;
+		overload_util = norm_util + (rtask->exectime_ns / rtask->period_ns);
+		norm_util += (rtask->nominal_exectime_ns / rtask->period_ns);
 
 		if (norm_util > 1 || overload_util > 1) {
 			return false;
@@ -174,6 +184,10 @@ static void compare(struct task *table, int tablesize, double *criticality)
 	numExp++;
 
 	if (numExp % 1000000 == 0) {
+		printf("Is Overloaded Scenario: %s, Is criticality as priority: %s\n",
+				non_overload_scenrio == true ? "NO" : "YES",
+				crit_as_prio == true ? "YES" : "NO");
+
 		printf("Num Tasks: %d, Exp Done: %d, Scheduable: %d, Unscheduable: %d (%.1f%%)\n",
 				NUM_TASK, numExp,
 				numExp - numUnscheduable,
@@ -248,10 +262,20 @@ int main(int argc, char **argv)
 			rtask->nominal_exectime_ns = (double)(rand() % exec) + 1;
 			rtask->exectime_ns = (double)exec;
 			rtask->period_ns = (double)period;
+
+			if (non_overload_scenrio == true) {
+				rtask->nominal_exectime_ns = rtask->exectime_ns;
+			}
 		}
 
-		/* Try all permutations of criticality */
-		permute(criticality, 0, NUM_TASK, compare, table);
+		if (crit_as_prio) {
+			/* Sort by inc order of priority */
+			qsort(table, NUM_TASK, sizeof(struct task), incPrioritySort);
+			compare(table, NUM_TASK, criticality);
+		} else {
+			/* Try all permutations of criticality */
+			permute(criticality, 0, NUM_TASK, compare, table);
+		}
 	}
 
 	return 0;
