@@ -42,7 +42,6 @@ static struct expFunc funcList[] =
 		.printOnFail = false,
 		.printOnCheckFail = false,
 	},
-
 	{
 		.name = "CAPAsched",
 		.func = CAPAIsTaskSched,
@@ -63,7 +62,6 @@ static struct expFunc funcList[] =
 		.printOnFail = false,
 		.printOnCheckFail = false,
 	},
-
 	{
 		.name = "ZSRMSSched",
 		.func = ZSRMSIsTaskSched,
@@ -124,7 +122,9 @@ static void compare(struct task *table, int tablesize, double *criticality)
 {
 	int i;
 	struct task *newtable = malloc(sizeof(struct task) * (size_t)tablesize);
+	struct task *tablecopy = malloc(sizeof(struct task) * (size_t)tablesize);
 	assert(newtable);
+	assert(tablecopy);
 
 	bool pass = false;
 	int fsize = sizeof(funcList)/ sizeof(funcList[0]);
@@ -134,7 +134,8 @@ static void compare(struct task *table, int tablesize, double *criticality)
 		table[i].criticality = criticality[i];
 	}
 
-	if (isTaskSetPossible(table, tablesize) == false)
+	memcpy(tablecopy, table, sizeof(struct task) * (size_t)tablesize);
+	if (isTaskSetPossible(tablecopy, tablesize) == false)
 		goto err;
 
 	for (i = 0; i < fsize; i++) {
@@ -170,7 +171,7 @@ static void compare(struct task *table, int tablesize, double *criticality)
 	/* If atleast someone passed but a function that req printing on fail didn't pass */
 	if (pass && printReq) {
 		printf("-------------------------------------------------------\n");
-		printTaskset(table, tablesize);
+		printTaskset(tablecopy, tablesize);
 
 		for (i = 0; i < fsize; i++) {
 			struct expFunc *ef = &funcList[i];
@@ -204,6 +205,7 @@ static void compare(struct task *table, int tablesize, double *criticality)
 
 err:
 	free(newtable);
+	free(tablecopy);
 }
 
 static void swap(double *a, double *b)
