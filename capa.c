@@ -47,7 +47,7 @@ int main(int argc, char **argv)
 	assert(checkTable(table, numEntry));
 
 	/* Sort table with higher criticality tasks at top */
-	qsort(table, numEntry, sizeof(struct task), criticalitySort);
+	qsort(table, (size_t)numEntry, sizeof(struct task), criticalitySort);
 
 	for (i = 0; i < numEntry; i++) {
 

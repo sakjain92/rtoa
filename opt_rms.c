@@ -144,7 +144,7 @@ int main(int argc, char **argv)
 	assert(checkTable(table, numEntry));
 
 	/* Sort table with higher criticality tasks at top */
-	qsort(table, numEntry, sizeof(struct task), criticalitySort);
+	qsort(table, (size_t)numEntry, sizeof(struct task), criticalitySort);
 
 	for (i = 0; i < numEntry; i++) {
 
@@ -154,7 +154,7 @@ int main(int argc, char **argv)
 				normTaskOComp(rtask),
 				normTaskPeriod(rtask),
 				rtask->criticality,
-				getOPTTaskResponseTime(table, numEntry, rtask));
+				getResponseTimePT(table, numEntry, rtask));
 
 		if (rtask->overload_task != NULL) {
 
@@ -164,7 +164,7 @@ int main(int argc, char **argv)
 					normTaskNComp(rtask->overload_task),
 					normTaskOComp(rtask->overload_task),
 					normTaskPeriod(rtask->overload_task),
-					rtask->overload_task->criticality;
+					rtask->overload_task->criticality);
 		}
 	}
 
