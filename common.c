@@ -301,7 +301,7 @@ double getResponseTimePT(struct task *table, int tablesize,
 
 			/* How many PT task comes in the remaining time? */
 			numArrivals = (int)ceill((remainderTime * n) / orig_period);
-			last_period_exec = numArrivals * table[selectedIdx].exectime_ns;
+			last_period_exec = numArrivals * normTaskOComp(&table[selectedIdx]);
 			resp += last_period_exec > orig_nominal_exectime ?
 				orig_nominal_exectime : last_period_exec;
 		}
@@ -310,7 +310,7 @@ double getResponseTimePT(struct task *table, int tablesize,
 	if (resp > normTaskPeriod(rtask))
 		return -1;
 
-  	return resp;
+	return resp;
 }
 
 
